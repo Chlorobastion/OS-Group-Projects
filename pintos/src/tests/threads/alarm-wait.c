@@ -21,7 +21,9 @@ test_alarm_single (void)
 void
 test_alarm_multiple (void) 
 {
+  printf("Before test_sleep in alarm multiple");
   test_sleep (5, 7);
+  printf("After test_sleep in alarm multiple");
 }
 
 void
