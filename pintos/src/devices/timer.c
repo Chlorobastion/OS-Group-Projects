@@ -172,6 +172,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  thread_wakeUp(); // Added by Akshay
   thread_tick ();
 }
 
