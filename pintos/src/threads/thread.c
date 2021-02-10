@@ -296,16 +296,6 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
-void thread_sleep(int64_t ticks) // Added by Akshay
-{
-	
-}
-
-void thread_wakeUp() // Added by Akshay
-{
-	
-}
-
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void

@@ -90,11 +90,16 @@ void
 timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
-
+  struct thread *current = thread_current(); // Gets the current thread
   ASSERT (intr_get_level () == INTR_ON);
+  intr_disable(); // Disables interrupt
+  
+  current -> status = THREAD_BLOCKED; // Blocks thread
+  intr_enable(); // Enables interrupt
+  
   /*while (timer_elapsed (start) < ticks) 
     thread_yield ();*/
-	thread_sleep (ticks); // Edited by Akshay
+	
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
