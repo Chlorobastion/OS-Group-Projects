@@ -28,6 +28,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of processes currently sleeping (Waiting a certain
+number of ticks before resuming where they left). */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -36,6 +40,14 @@ static struct thread *initial_thread;
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
+
+/* Function to determine which thread is going to wake up sonner. -SN */
+static bool thread_wake_sooner (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+  const struct thread *thread1 = list_entry (elem1, struct thread, sleepelem);
+  const struct thread *thread2 = list_entry (elem2, struct thread, sleepelem);
+  return thread1->time_to_wake > thread2->time_to_wake;
+}
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -92,6 +104,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -443,6 +456,7 @@ running_thread (void)
 static bool
 is_thread (struct thread *t)
 {
+  ASSERT(t->magic == THREAD_MAGIC);
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
@@ -582,3 +596,76 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* Function called by timer.c to put threads to sleep. -SN */
+void
+thread_lullaby (int64_t wake_up_time)
+{
+   struct thread *cur = thread_current ();
+   enum intr_level old_level;
+
+   old_level = intr_disable();
+   if(cur != idle_thread)
+   {
+     //list_push_front(&sleep_list, &cur->sleepelem);
+     list_insert_ordered(&sleep_list, &cur->sleepelem, thread_wake_sooner, NULL);
+     cur->time_to_wake = wake_up_time;
+     thread_block ();
+   }
+   intr_set_level(old_level);
+}
+
+/* Function called at timer_tick to see if a thread is ready. -SN */
+void
+thread_wake_up (int64_t current_time)
+{
+/*
+  if(list_size(&sleep_list) > 0)
+  {
+      intr_disable();
+    struct thread *top_sleeper = list_entry (list_front (&sleep_list), struct thread, sleepelem);
+
+    if(top_sleeper != NULL && (current_time >= top_sleeper->time_to_wake))
+    {
+      printf("Are we here?\n");
+      thread_unblock(&top_sleeper); // Wake the thread up
+      printf("Are we there?\n");
+      list_pop_front(&sleep_list); // Remove the thread from the sleep list
+    }
+      //intr_enable(); // Might need commenting out COMMENT: DELETE ME
+  }
+*/
+ if(list_size(&sleep_list) > 0)
+ {
+    struct list_elem *temp, *e = list_begin(&sleep_list);
+  
+    while(e != list_end(&sleep_list))
+    {
+      struct thread *t = list_entry(e, struct thread, sleepelem);
+
+      if (current_time >= t->time_to_wake)
+      {
+         list_push_back(&ready_list, &t->elem);
+         t->status = THREAD_READY;
+         temp = e;
+         e = list_next(e);
+         list_remove(temp);
+      }
+      else e = list_next(e);
+    }
+  }
+  /*
+  if(list_size(&sleep_list) > 0)
+  {
+    struct list_elem *top_elem = list_begin(&sleep_list);
+    struct thread *top_sleeper = list_entry (top_elem, struct thread, sleepelem);
+
+    if(current_time >= top_sleeper->time_to_wake)
+    {
+      list_push_back(&ready_list, &top_sleeper->elem);
+      top_sleeper->status = THREAD_READY;
+      list_remove(top_elem);
+    }
+  }
+  */
+}

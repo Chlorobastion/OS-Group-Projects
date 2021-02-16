@@ -91,6 +91,10 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    struct list_elem sleepelem;         /* List element for sleeping threads list. -SN */
+    int64_t time_to_wake;               /* The time when the thread is expected to wake. -SN */
+
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     int64_t timeToWakeUp;               /* Remaining time for the thread to wakeup */
@@ -141,5 +145,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void thread_lullaby (int64_t);
+void thread_wake_up (int64_t);
 
 #endif /* threads/thread.h */

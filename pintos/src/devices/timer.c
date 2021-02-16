@@ -105,13 +105,24 @@ timer_sleep (int64_t ticks)
   struct thread *current = thread_current(); // Gets the current thread
   current->timeToWakeUp = timer_ticks() + ticks; // Updates wakeup time of this thread
   ASSERT (intr_get_level () == INTR_ON);
+<<<<<<< HEAD
   intr_disable(); // Disables interrupt
   list_insert_ordered(&sleep_wait_list, &current->sleeping_elem, thread_lower_priority, NULL); //Adds the element to sleep_wait_list
   intr_enable(); // Enables interrupt
   sema_down(&current->timer_sema); // Blocks thread
   
+=======
+
+  /* New method of putting thread to sleep! -SN */
+  int64_t wake_up_time = start + ticks;
+  thread_lullaby(wake_up_time);
+
+  /* Old method using busy waiting */
+  /*
+>>>>>>> Implemented wake and sleep in thread.c to avoid busy waiting. Wake function could be improved by fixing the ordered list and using that, but SN could not figure it out yet. I used project 1 starter code for help.
   while (timer_elapsed (start) < ticks) 
     thread_yield ();
+  */
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -189,6 +200,11 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  
+  int64_t current_time = timer_ticks ();
+  /* Check if the top thread in the wait list is ready to go. -SN */
+  thread_wake_up(current_time);
+
   thread_tick ();
   //enum intr_level ol = intr_disable();
   // while (!list_empty(&sleep_wait_list)) { // While loop to recruse through the list of threads sleeping
