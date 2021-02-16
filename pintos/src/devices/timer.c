@@ -7,8 +7,6 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-
-
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -31,7 +29,6 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-static struct list sleep_wait_list; //List of elements sleeping.
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -40,7 +37,6 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  list_init(&sleep_wait_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -88,30 +84,13 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
-/* Returns true if thread a has lower priority than thread b,within a list of threads. */
-static bool thread_lower_priority (const struct list_elem *a_,const struct list_elem *b_,void *aux UNUSED)
-{
-    const struct thread *a = list_entry (a_, struct thread, sleeping_elem);
-    const struct thread *b = list_entry (b_, struct thread, sleeping_elem);
-    return a->timeToWakeUp < b->timeToWakeUp;
-}
-
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
-  struct thread *current = thread_current(); // Gets the current thread
-  current->timeToWakeUp = timer_ticks() + ticks; // Updates wakeup time of this thread
   ASSERT (intr_get_level () == INTR_ON);
-<<<<<<< HEAD
-  intr_disable(); // Disables interrupt
-  list_insert_ordered(&sleep_wait_list, &current->sleeping_elem, thread_lower_priority, NULL); //Adds the element to sleep_wait_list
-  intr_enable(); // Enables interrupt
-  sema_down(&current->timer_sema); // Blocks thread
-  
-=======
 
   /* New method of putting thread to sleep! -SN */
   int64_t wake_up_time = start + ticks;
@@ -119,7 +98,6 @@ timer_sleep (int64_t ticks)
 
   /* Old method using busy waiting */
   /*
->>>>>>> Implemented wake and sleep in thread.c to avoid busy waiting. Wake function could be improved by fixing the ordered list and using that, but SN could not figure it out yet. I used project 1 starter code for help.
   while (timer_elapsed (start) < ticks) 
     thread_yield ();
   */
@@ -206,15 +184,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
   thread_wake_up(current_time);
 
   thread_tick ();
-  //enum intr_level ol = intr_disable();
-  // while (!list_empty(&sleep_wait_list)) { // While loop to recruse through the list of threads sleeping
-  //     struct thread *top = list_entry(list_front(&sleep_wait_list), struct thread, sleeping_elem); // Gets the top element from sleep wait list
-
-  //     if (timer_ticks() < top->timeToWakeUp) break; // If time is less than wakeup time of that thread, wait.
-  //     sema_up(&top->timer_sema);
-  //     list_pop_front(&sleep_wait_list);
-  // }
-  //intr_set_level(ol);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

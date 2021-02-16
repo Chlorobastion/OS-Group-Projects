@@ -49,6 +49,16 @@ static bool thread_wake_sooner (const struct list_elem *elem1, const struct list
   return thread1->time_to_wake > thread2->time_to_wake;
 }
 
+/* Returns true if thread a has lower priority than thread b, within a list of threads. */
+/* We will use this code when we start the priority side.
+static bool thread_lower_priority (const struct list_elem *a_,const struct list_elem *b_,void *aux UNUSED)
+{
+    const struct thread *a = list_entry (a_, struct thread, sleeping_elem);
+    const struct thread *b = list_entry (b_, struct thread, sleeping_elem);
+    return a->timeToWakeUp < b->timeToWakeUp;
+}
+*/
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -619,7 +629,7 @@ thread_lullaby (int64_t wake_up_time)
 void
 thread_wake_up (int64_t current_time)
 {
-/*
+/* My initial strategy (FAILED) PLZ DELETE ME BEFORE TURN IN -SN
   if(list_size(&sleep_list) > 0)
   {
       intr_disable();
@@ -654,7 +664,7 @@ thread_wake_up (int64_t current_time)
       else e = list_next(e);
     }
   }
-  /*
+  /* My hybrid strategy (FAILED) Maybe try to make it work with insert ordered? -SN
   if(list_size(&sleep_list) > 0)
   {
     struct list_elem *top_elem = list_begin(&sleep_list);

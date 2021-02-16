@@ -97,9 +97,6 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int64_t timeToWakeUp;               /* Remaining time for the thread to wakeup */
-    struct list_elem sleeping_elem;     /* Element waiting to wakeup */
-    struct semaphore timer_sema;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
