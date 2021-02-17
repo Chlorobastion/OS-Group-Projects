@@ -41,23 +41,21 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
-/* Function to determine which thread is going to wake up sonner. -SN */
+/* Function to determine if thread 1 is going to wake up sonner than thread 2. -SN */
 static bool thread_wake_sooner (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
   const struct thread *thread1 = list_entry (elem1, struct thread, sleepelem);
   const struct thread *thread2 = list_entry (elem2, struct thread, sleepelem);
-  return thread1->time_to_wake > thread2->time_to_wake;
+  return thread1->time_to_wake < thread2->time_to_wake;
 }
 
-/* Returns true if thread a has lower priority than thread b, within a list of threads. */
-/* We will use this code when we start the priority side.
-static bool thread_lower_priority (const struct list_elem *a_,const struct list_elem *b_,void *aux UNUSED)
+/* Returns true if thread a has higher priority than thread b, within a list of threads. (Inverted from less function) */
+static bool thread_lower_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
-    const struct thread *a = list_entry (a_, struct thread, sleeping_elem);
-    const struct thread *b = list_entry (b_, struct thread, sleeping_elem);
-    return a->timeToWakeUp < b->timeToWakeUp;
+    const struct thread *thread1 = list_entry (elem1, struct thread, elem);
+    const struct thread *thread2 = list_entry (elem2, struct thread, elem);
+    return thread1->priority > thread2->priority;
 }
-*/
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -260,7 +258,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  //list_push_back (&ready_list, &t->elem); // Old ready list insert does not account for order
+  list_insert_ordered(&ready_list, &t->elem, &thread_lower_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -331,7 +330,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    //list_push_back (&ready_list, &cur->elem); // Old ready list insert does not account for order
+    list_insert_ordered(&ready_list, &cur->elem, &thread_lower_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -359,6 +359,12 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  /* If the highest priority thread in the list is higher than the new running priority, the running thread yields. -SN */
+  struct thread *top_thread = list_entry(list_begin(&ready_list), struct thread, elem);
+  if(new_priority < top_thread->priority)
+  {
+     thread_yield();
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -618,7 +624,7 @@ thread_lullaby (int64_t wake_up_time)
    if(cur != idle_thread)
    {
      //list_push_front(&sleep_list, &cur->sleepelem);
-     list_insert_ordered(&sleep_list, &cur->sleepelem, thread_wake_sooner, NULL);
+     list_insert_ordered(&sleep_list, &cur->sleepelem, &thread_wake_sooner, NULL);
      cur->time_to_wake = wake_up_time;
      thread_block ();
    }
@@ -655,7 +661,8 @@ thread_wake_up (int64_t current_time)
 
       if (current_time >= t->time_to_wake)
       {
-         list_push_back(&ready_list, &t->elem);
+         //list_push_back(&ready_list, &t->elem); // Old ready list insert does not account for order
+         list_insert_ordered(&ready_list, &t->elem, &thread_lower_priority, NULL);
          t->status = THREAD_READY;
          temp = e;
          e = list_next(e);
@@ -672,8 +679,7 @@ thread_wake_up (int64_t current_time)
 
     if(current_time >= top_sleeper->time_to_wake)
     {
-      list_push_back(&ready_list, &top_sleeper->elem);
-      top_sleeper->status = THREAD_READY;
+      thread_unblock();
       list_remove(top_elem);
     }
   }
