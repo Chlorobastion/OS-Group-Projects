@@ -198,8 +198,31 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-
+  struct thread* current_thread = thread_current();
+  /* If the thread that currently has the lock has a lower priority,
+     this thread gives it's priority to the thread that currently has the lock -LF */
+  if (lock->holder != NULL) 
+  {
+    if (lock->holder->priority < current_thread->priority) 
+    {
+        thread_set_lock_priority(current_thread->priority, lock->holder);
+    }
+  }
   sema_down (&lock->semaphore);
+  /* If the thread that currently has the lock has a lower priority,
+     this thread gives it's priority to the thread that currently has the lock -LF */
+  //if (lock->holder->priority < thread_current()->priority)
+  //{
+      //old_priority = lock->holder->priority;
+      //lock->holder->priority = thread_current()->priority;
+  //}
+  /* if the priority was donated, this ensures the previous 
+     lock holder recieves their old priority before completely loosing -LF 
+  if (old_priority != NULL) 
+  {
+      lock->holder->priority = old_priority;
+  }*/
+  //printf("with no survivors");
   lock->holder = thread_current ();
 }
 
@@ -236,6 +259,8 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  struct thread* current_thread = thread_current();
+  current_thread->priority = current_thread->old_priority;
 }
 
 /* Returns true if the current thread holds LOCK, false

@@ -366,7 +366,21 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  thread_current ()->old_priority = new_priority; // this updates the old priority used in thread donations -LF
   /* If the highest priority thread in the list is higher than the new running priority, the running thread yields. -SN */
+  struct thread *top_thread = list_entry(list_begin(&ready_list), struct thread, elem);
+  if(new_priority < top_thread->priority)
+  {
+     thread_yield();
+  }
+}
+
+/* Sets only the target thread's current priority to NEW_PRIORITY, used in thread donation. -LF*/
+void
+thread_set_lock_priority (int new_priority, struct thread* target)
+{
+  target->priority = new_priority; // just the read priority is the updated priority
+  /* just following what happens in thread_set_priority, making sure the right thread is running -LF */
   struct thread *top_thread = list_entry(list_begin(&ready_list), struct thread, elem);
   if(new_priority < top_thread->priority)
   {
@@ -499,6 +513,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->old_priority = priority; // this initializes the original priority, used in thread donation -LF
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

@@ -93,6 +93,7 @@ struct thread
 
     struct list_elem sleepelem;         /* List element for sleeping threads list. -SN */
     int64_t time_to_wake;               /* The time when the thread is expected to wake. -SN */
+    int old_priority;
 
 
     /* Shared between thread.c and synch.c. */
@@ -137,6 +138,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_set_lock_priority (int, struct thread*); // this is added by us -LF
 
 int thread_get_nice (void);
 void thread_set_nice (int);
