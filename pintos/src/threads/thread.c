@@ -222,6 +222,13 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  struct thread *cur = thread_current();
+  /* If the new thread has a higher priority than the current thread, the current should yield. */
+  if(t->priority > cur->priority)
+  {
+    thread_yield();
+  }
+
   return tid;
 }
 
@@ -253,7 +260,7 @@ void
 thread_unblock (struct thread *t) 
 {
   enum intr_level old_level;
-
+  
   ASSERT (is_thread (t));
 
   old_level = intr_disable ();
@@ -261,6 +268,7 @@ thread_unblock (struct thread *t)
   //list_push_back (&ready_list, &t->elem); // Old ready list insert does not account for order
   list_insert_ordered(&ready_list, &t->elem, &thread_lower_priority, NULL);
   t->status = THREAD_READY;
+  
   intr_set_level (old_level);
 }
 
@@ -325,7 +333,6 @@ thread_yield (void)
 {
   struct thread *cur = thread_current ();
   enum intr_level old_level;
-  
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
