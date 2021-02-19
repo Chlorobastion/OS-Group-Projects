@@ -96,6 +96,7 @@ struct thread
     int64_t time_to_wake;               /* The time when the thread is expected to wake. -SN */
     int old_priority;                   /* Priority to return to after holding a lock -LF */
     struct list donaters;               /* this is a list of every donater to this thread -LF */
+    struct thread* donated_to;          /* this is the thread the current thread has donated to, if not NULL */
     
 
     /* Shared between thread.c and synch.c. */

@@ -221,6 +221,7 @@ lock_acquire (struct lock *lock)
   }*/
   //printf("with no survivors");
   lock->holder = thread_current ();
+  lock->holder->donated_to = NULL;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
