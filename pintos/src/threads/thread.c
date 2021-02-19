@@ -388,40 +388,51 @@ thread_set_lock_priority (int new_priority, struct thread* target)
   }
 }
 
+/* Donates the current thread's priority if it is higher than the target's priority */
 void
 thread_donate_priority(struct thread* target)
 {
   struct thread* this_thread = thread_current();
   if (this_thread->priority > target->priority)
   {
-    this_thread->donater_priority = target->priority;
-    thread_set_lock_priority(this_thread->priority, target);
+    list_insert_ordered(target->donaters, &this_thread->elem, thread_higher_priority, NULL);
+    target->priority = this_thread->priority;
+    thread_yield();
   }
 }
 
 void
 thread_return_priority(struct list* waiting)
 {
-  if (!list_empty(waiting))
+  if (!list_empty(waiting) && !list_empty(thread_current()->donaters))
   {
     struct thread* this_thread = thread_current();
-    struct thread* next_thread = NULL;
-    struct list_elem* e = list_begin (waiting);
-    while(e != list_end(waiting))
+    struct thread* sema_thread = NULL;
+    struct thread* dona_thread = NULL;
+    struct list_elem* sema = list_begin (waiting);
+    while(sema != list_end(waiting))
     {
-      next_thread = list_entry (e, struct thread, elem);
-      if (this_thread->priority == next_thread->priority)
+      sema_thread = list_entry(sema, struct thread, elem);
+      struct list_elem* donater = list_begin(this_thread->donaters);
+      while(donater != list_end(this_thread->donaters))
       {
-        if (next_thread->donater_priority != NULL)
+        dona_thread = list_entry(donater, struct thread, elem);
+        if (sema_thread->tid == dona_thread->tid)
         {
-          thread_set_priority(next_thread->donater_priority);
+          list_remove(donater);
+          break;
         }
       }
-      else
-      {
-        break;
-      }
-      e = list_next(e);
+      sema = list_next(sema);
+    }
+    if (list_empty(this_thread->donaters))
+    {
+      this_thread->priority = this_thread->old_priority;
+    }
+    else
+    {
+      this_thread->priority = list_entry(list_begin(this_thread->donaters), struct thread, elem)
+                                  ->priority;
     }
   }
 }
@@ -552,6 +563,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->old_priority = priority; // this initializes the original priority, used in thread donation -LF
+  list_init(&(t->donaters));
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
