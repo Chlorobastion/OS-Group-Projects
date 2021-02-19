@@ -201,7 +201,7 @@ lock_acquire (struct lock *lock)
   struct thread* current_thread = thread_current();
   /* If the thread that currently has the lock has a lower priority,
      this thread gives it's priority to the thread that currently has the lock -LF */
-  if (lock->holder != NULL) 
+  if (lock->holder != NULL)
   {
     thread_donate_priority(lock->holder);
   }

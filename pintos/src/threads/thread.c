@@ -57,6 +57,14 @@ bool thread_higher_priority (const struct list_elem *elem1, const struct list_el
     return thread1->priority > thread2->priority;
 }
 
+/* Returns true if thread a has higher priority than thread b, within a list of threads. (Inverted from less function) */
+bool thread_higher_donate_priority (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    const struct thread *thread1 = list_entry (elem1, struct thread, donateelem);
+    const struct thread *thread2 = list_entry (elem2, struct thread, donateelem);
+    return thread1->priority > thread2->priority;
+}
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -366,10 +374,9 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
-  thread_current ()->old_priority = new_priority; // this updates the old priority used in thread donations -LF
   /* If the highest priority thread in the list is higher than the new running priority, the running thread yields. -SN */
-  struct thread *top_thread = list_entry(list_begin(&ready_list), struct thread, elem);
-  if(new_priority < top_thread->priority)
+  struct thread *top = list_entry(list_begin(&ready_list), struct thread, elem);
+  if(new_priority < top->priority)
   {
      thread_yield();
   }
@@ -395,7 +402,7 @@ thread_donate_priority(struct thread* target)
   struct thread* this_thread = thread_current();
   if (this_thread->priority > target->priority)
   {
-    list_insert_ordered(target->donaters, &this_thread->elem, thread_higher_priority, NULL);
+    list_insert_ordered(&target->donaters, &this_thread->donateelem, thread_higher_donate_priority, NULL);
     target->priority = this_thread->priority;
     thread_yield();
   }
@@ -404,7 +411,7 @@ thread_donate_priority(struct thread* target)
 void
 thread_return_priority(struct list* waiting)
 {
-  if (!list_empty(waiting) && !list_empty(thread_current()->donaters))
+  if (!list_empty(waiting) && !list_empty(&thread_current()->donaters))
   {
     struct thread* this_thread = thread_current();
     struct thread* sema_thread = NULL;
@@ -413,26 +420,27 @@ thread_return_priority(struct list* waiting)
     while(sema != list_end(waiting))
     {
       sema_thread = list_entry(sema, struct thread, elem);
-      struct list_elem* donater = list_begin(this_thread->donaters);
-      while(donater != list_end(this_thread->donaters))
+      struct list_elem* donater = list_begin(&this_thread->donaters);
+      while(donater != list_end(&this_thread->donaters))
       {
-        dona_thread = list_entry(donater, struct thread, elem);
+        dona_thread = list_entry(donater, struct thread, donateelem);
         if (sema_thread->tid == dona_thread->tid)
         {
           list_remove(donater);
           break;
         }
+        donater = list_next(donater);
       }
       sema = list_next(sema);
     }
-    if (list_empty(this_thread->donaters))
+    if (list_empty(&this_thread->donaters))
     {
-      this_thread->priority = this_thread->old_priority;
+      thread_set_priority(this_thread->old_priority);
     }
     else
     {
-      this_thread->priority = list_entry(list_begin(this_thread->donaters), struct thread, elem)
-                                  ->priority;
+      thread_set_priority(list_entry(list_begin(&this_thread->donaters), struct thread, donateelem)
+                                  ->priority);
     }
   }
 }
@@ -563,7 +571,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->old_priority = priority; // this initializes the original priority, used in thread donation -LF
-  list_init(&(t->donaters));
+  list_init(&t->donaters);
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

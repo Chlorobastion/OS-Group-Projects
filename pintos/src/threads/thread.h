@@ -92,10 +92,10 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct list_elem sleepelem;         /* List element for sleeping threads list. -SN */
+    struct list_elem donateelem;
     int64_t time_to_wake;               /* The time when the thread is expected to wake. -SN */
     int old_priority;                   /* Priority to return to after holding a lock -LF */
-    int donater_priority;               /* old Priority of thread which we donated to -LF */
-    struct list* donaters;              /* this is a list of every donater to this thread -LF */
+    struct list donaters;               /* this is a list of every donater to this thread -LF */
     
 
     /* Shared between thread.c and synch.c. */
