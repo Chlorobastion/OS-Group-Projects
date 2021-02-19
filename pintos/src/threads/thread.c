@@ -388,6 +388,44 @@ thread_set_lock_priority (int new_priority, struct thread* target)
   }
 }
 
+void
+thread_donate_priority(struct thread* target)
+{
+  struct thread* this_thread = thread_current();
+  if (this_thread->priority > target->priority)
+  {
+    this_thread->donater_priority = target->priority;
+    thread_set_lock_priority(this_thread->priority, target);
+  }
+}
+
+void
+thread_return_priority(struct list* waiting)
+{
+  if (!list_empty(waiting))
+  {
+    struct thread* this_thread = thread_current();
+    struct thread* next_thread = NULL;
+    struct list_elem* e = list_begin (waiting);
+    while(e != list_end(waiting))
+    {
+      next_thread = list_entry (e, struct thread, elem);
+      if (this_thread->priority == next_thread->priority)
+      {
+        if (next_thread->donater_priority != NULL)
+        {
+          thread_set_priority(next_thread->donater_priority);
+        }
+      }
+      else
+      {
+        break;
+      }
+      e = list_next(e);
+    }
+  }
+}
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
