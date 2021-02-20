@@ -704,7 +704,7 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* Function called by timer.c to put threads to sleep. -SN */
 void
-thread_lullaby (int64_t wake_up_time)
+thread_sleep (int64_t wake_up_time)
 {
    struct thread *cur = thread_current ();
    enum intr_level old_level;
