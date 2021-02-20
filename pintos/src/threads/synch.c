@@ -320,10 +320,19 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered (&cond->waiters, &waiter.elem, thread_higher_priority, NULL); // Insert in sorted order
+  list_insert_ordered (&cond->waiters, &waiter.elem, semaphore_elem_order, NULL); // Insert in sorted order
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
+}
+
+bool semaphore_elem_order (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+{
+    const struct semaphore_elem *sema_elem1 = list_entry (elem1, struct semaphore_elem, elem);
+    const struct semaphore_elem *sema_elem2 = list_entry (elem2, struct semaphore_elem, elem);
+    int priority1 = (list_entry(list_begin(&(&sema_elem1->semaphore)->waiters), struct thread, elem))->priority;
+    int priority2 = (list_entry(list_begin(&(&sema_elem2->semaphore)->waiters), struct thread, elem))->priority;
+    return priority1 > priority2;
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -342,7 +351,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) {
-    list_sort(&cond->waiters, thread_higher_priority, NULL); // Sorts list with highest priority being first
+    list_sort(&cond->waiters, semaphore_elem_order, NULL); // Sorts list with highest priority being first
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
   }
