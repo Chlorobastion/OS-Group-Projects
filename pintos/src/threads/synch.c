@@ -199,27 +199,13 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   struct thread* current_thread = thread_current();
-  /* If the thread that currently has the lock has a lower priority,
-     this thread gives it's priority to the thread that currently has the lock -LF */
+  /* If there's a thread that already has the lock, we call thread_donate_priority
+     to check if our current thread can donate it's priority -LF */
   if (lock->holder != NULL)
   {
     thread_donate_priority(lock->holder);
   }
   sema_down (&lock->semaphore);
-  /* If the thread that currently has the lock has a lower priority,
-     this thread gives it's priority to the thread that currently has the lock -LF */
-  //if (lock->holder->priority < thread_current()->priority)
-  //{
-      //old_priority = lock->holder->priority;
-      //lock->holder->priority = thread_current()->priority;
-  //}
-  /* if the priority was donated, this ensures the previous 
-     lock holder recieves their old priority before completely loosing -LF 
-  if (old_priority != NULL) 
-  {
-      lock->holder->priority = old_priority;
-  }*/
-  //printf("with no survivors");
   lock->holder = thread_current ();
   lock->holder->donated_to = NULL;
 }
@@ -326,7 +312,10 @@ cond_wait (struct condition *cond, struct lock *lock)
   lock_acquire (lock);
 }
 
-bool semaphore_elem_order (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
+/* A simple method that orders the semaphore_elems given to us from cond_wait and cond_signal
+   ints are stored for readability -LF */
+bool 
+semaphore_elem_order (const struct list_elem *elem1, const struct list_elem *elem2, void *aux UNUSED)
 {
     const struct semaphore_elem *sema_elem1 = list_entry (elem1, struct semaphore_elem, elem);
     const struct semaphore_elem *sema_elem2 = list_entry (elem2, struct semaphore_elem, elem);

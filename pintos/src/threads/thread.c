@@ -273,7 +273,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  //list_push_back (&ready_list, &t->elem); // Old ready list insert does not account for order
   list_insert_ordered(&ready_list, &t->elem, thread_higher_priority, NULL);
   t->status = THREAD_READY;
   
@@ -345,7 +344,6 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    //list_push_back (&ready_list, &cur->elem); // Old ready list insert does not account for order
     list_insert_ordered(&ready_list, &cur->elem, thread_higher_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
@@ -391,11 +389,11 @@ void
 thread_set_lock_priority (int new_priority, struct thread* target)
 {
   target->priority = new_priority; // just the read priority is the updated priority
-  /* just following what happens in thread_set_priority, making sure the right thread is running -LF */
   if (target->donated_to != NULL)
   {
     thread_set_lock_priority(new_priority, target->donated_to);
   }
+  /* just following what happens in thread_set_priority, making sure the right thread is running -LF */
   struct thread *top_thread = list_entry(list_begin(&ready_list), struct thread, elem);
   if(new_priority < top_thread->priority)
   {
@@ -413,11 +411,11 @@ thread_donate_priority(struct thread* target)
     list_insert_ordered(&target->donaters, &this_thread->donateelem, thread_higher_donate_priority, NULL);
     thread_set_lock_priority(this_thread->priority, target);
     this_thread->donated_to = target;
-    //target->priority = this_thread->priority;
-    //thread_yield();
   }
 }
 
+/* returns the thread back to it's required priority after releasing a lock, removes donaters
+   from the current thread's donater_list found in argument waiting */
 void
 thread_return_priority(struct list* waiting)
 {
@@ -726,22 +724,6 @@ thread_lullaby (int64_t wake_up_time)
 void
 thread_wake_up (int64_t current_time)
 {
-/* My initial strategy (FAILED) PLZ DELETE ME BEFORE TURN IN -SN
-  if(list_size(&sleep_list) > 0)
-  {
-      intr_disable();
-    struct thread *top_sleeper = list_entry (list_front (&sleep_list), struct thread, sleepelem);
-
-    if(top_sleeper != NULL && (current_time >= top_sleeper->time_to_wake))
-    {
-      printf("Are we here?\n");
-      thread_unblock(&top_sleeper); // Wake the thread up
-      printf("Are we there?\n");
-      list_pop_front(&sleep_list); // Remove the thread from the sleep list
-    }
-      //intr_enable(); // Might need commenting out COMMENT: DELETE ME
-  }
-*/
  if(list_size(&sleep_list) > 0)
  {
     struct list_elem *temp, *e = list_begin(&sleep_list);
@@ -752,7 +734,6 @@ thread_wake_up (int64_t current_time)
 
       if (current_time >= t->time_to_wake)
       {
-         //list_push_back(&ready_list, &t->elem); // Old ready list insert does not account for order
          list_insert_ordered(&ready_list, &t->elem, thread_higher_priority, NULL);
          t->status = THREAD_READY;
          temp = e;
@@ -762,17 +743,4 @@ thread_wake_up (int64_t current_time)
       else e = list_next(e);
     }
   }
-  /* My hybrid strategy (FAILED) Maybe try to make it work with insert ordered? -SN
-  if(list_size(&sleep_list) > 0)
-  {
-    struct list_elem *top_elem = list_begin(&sleep_list);
-    struct thread *top_sleeper = list_entry (top_elem, struct thread, sleepelem);
-
-    if(current_time >= top_sleeper->time_to_wake)
-    {
-      thread_unblock();
-      list_remove(top_elem);
-    }
-  }
-  */
 }
