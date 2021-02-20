@@ -92,7 +92,7 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
 
     struct list_elem sleepelem;         /* List element for sleeping threads list. -SN */
-    struct list_elem donateelem;
+    struct list_elem donateelem;        /* List element for donaters list. -AM */
     int64_t time_to_wake;               /* The time when the thread is expected to wake. -SN */
     int old_priority;                   /* Priority to return to after holding a lock -LF */
     struct list donaters;               /* this is a list of every donater to this thread -LF */
@@ -151,7 +151,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void thread_lullaby (int64_t);
+void thread_sleep (int64_t);
 void thread_wake_up (int64_t);
 
 #endif /* threads/thread.h */

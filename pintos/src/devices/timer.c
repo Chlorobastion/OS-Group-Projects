@@ -85,22 +85,15 @@ timer_elapsed (int64_t then)
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+   be turned on. 
+   New method of putting thread to sleep! -SN */
 void
 timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
   ASSERT (intr_get_level () == INTR_ON);
-
-  /* New method of putting thread to sleep! -SN */
   int64_t wake_up_time = start + ticks;
-  thread_lullaby(wake_up_time);
-
-  /* Old method using busy waiting */
-  /*
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
-  */
+  thread_sleep(wake_up_time);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -173,16 +166,14 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+/* Timer interrupt handler.
+ Check if the top thread in the wait list is ready to go. -SN */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  
   int64_t current_time = timer_ticks ();
-  /* Check if the top thread in the wait list is ready to go. -SN */
   thread_wake_up(current_time);
-
   thread_tick ();
 }
 

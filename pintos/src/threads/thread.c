@@ -273,7 +273,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, thread_higher_priority, NULL);
+  list_insert_ordered(&ready_list, &t->elem, thread_higher_priority, NULL); // Inserts into ready list in order of high to low priority - AM
   t->status = THREAD_READY;
   
   intr_set_level (old_level);
@@ -344,7 +344,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, thread_higher_priority, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, thread_higher_priority, NULL); // Inserts into ready list in order of high to low priority - AM
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -712,7 +712,6 @@ thread_sleep (int64_t wake_up_time)
    old_level = intr_disable();
    if(cur != idle_thread)
    {
-     //list_push_front(&sleep_list, &cur->sleepelem);
      list_insert_ordered(&sleep_list, &cur->sleepelem, &thread_wake_sooner, NULL);
      cur->time_to_wake = wake_up_time;
      thread_block ();
@@ -724,23 +723,21 @@ thread_sleep (int64_t wake_up_time)
 void
 thread_wake_up (int64_t current_time)
 {
- if(list_size(&sleep_list) > 0)
- {
-    struct list_elem *temp, *e = list_begin(&sleep_list);
-  
-    while(e != list_end(&sleep_list))
-    {
-      struct thread *t = list_entry(e, struct thread, sleepelem);
+   if(list_size(&sleep_list) > 0)
+  {
+      struct list_elem *e = list_front(&sleep_list);
 
-      if (current_time >= t->time_to_wake)
+      while(e != list_end(&sleep_list))
       {
-         list_insert_ordered(&ready_list, &t->elem, thread_higher_priority, NULL);
-         t->status = THREAD_READY;
-         temp = e;
-         e = list_next(e);
-         list_remove(temp);
+        struct thread *top_thread = list_entry(e, struct thread, sleepelem);
+
+        if (current_time >= top_thread->time_to_wake)
+        {
+          thread_unblock(top_thread);
+          list_remove(e);
+          e = list_next(e);
+        }
+        else e = list_next(e);
       }
-      else e = list_next(e);
-    }
   }
 }
