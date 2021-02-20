@@ -1,0 +1,253 @@
+
+CIS 520 - Programming Project #1
+
+                   
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Akshay Mhatre <akshay1999@ksu.edu>
+Luke Falk <lmfalk@ksu.edu>
+Sebastian Neal <neal01@ksu.edu>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for
+>> the TA, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation,
+>> course text, lecture notes, and course staff.
+
+-Project 1 Starter Code
+-TA and Professor help sessions (advice from these people and other
+students in session)
+-https://github.com/yuan901202/vuw_nwen301_pintos_1
+-https://github.com/hindol/pintos
+-http://people.cs.ksu.edu/~bstinson/courses/cis520/grandepintos/
+
+
+                 ALARM CLOCK
+                 ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+------------------------------------------------------------------------
+Purpose: Changes were made to keep track of this thread in various lists
+and the threads donating their priority to this one.
+
+struct thread
+  {
+    /* Owned by thread.c. */
+    tid_t tid;                          /* Thread identifier. */
+    enum thread_status status;          /* Thread state. */
+    char name[16];                      /* Name (for debugging purposes). */
+    uint8_t *stack;                     /* Saved stack pointer. */
+    int priority;                       /* Priority. */
+    struct list_elem allelem;           /* List element for all threads list. */
+
+    struct list_elem sleepelem;         /* List element for sleeping threads list. -SN */
+    struct list_elem donateelem;
+    int64_t time_to_wake;               /* The time when the thread is expected to wake. -SN */
+    int old_priority;                   /* Priority to return to after holding a lock -LF */
+    struct list donaters;               /* this is a list of every donater to this thread -LF */
+    struct thread* donated_to;          /* this is the thread the current thread has donated to, if not NULL */
+    
+
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
+
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+#endif
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
+  };
+------------------------------------------------------------------------
+
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to your timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+Timer_sleep() has a call to thread_sleep() which is a function in thread.c
+that puts the thread to sleep. It does this by putting the thread onto a
+static sleeping list (sleep_list) and then using the thread_block()
+function provided in the code to put the thread to sleep. The thread is
+woken by checking if the time saved for it to wake up (time_to_wake)
+has been passed by the OS timer ticks; when that has happened, the thread
+is removed from the sleeping list and thrown onto the ready list, with
+its status being updated from blocked to ready.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+We use the thread_block() function, which was provided and we thought
+spent minimal time in the timer interrupt handler. We had some trouble
+in the thread_wake_up() function, but when we found the provided starter
+code, it helped us get our code operational. If we could have found a
+way to make the sleep list ordered properly, we could have saved some
+time iterating over the list, but attempts to make that work all ended
+in failure.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+The only shared data that could suffer from a race condition would
+be the sleep_list where all of the sleeping threads are stored. We
+use the pintos provided method of inserting into the list and we
+believe this avoids race conditions by default.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+Again, we believe that the pintos provided method of inserting into
+the sleeping list avoids these kinds of race conditions, and we did
+not experience any issues contrary in that regard.
+
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> other designs that you considered?
+
+Well, firstly, the design is functional! Additionally, by using functions
+and structures that are already in the code, we can avoid redundancy and
+lean on the expertise of the programmers who came before us and have a
+good chance to use their optimized code.
+
+
+             PRIORITY SCHEDULING
+             ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+Inside struct thread:
+int old_priority; <<this holds what the thread should return to if there were no locks held>>
+struct list donaters; <<this holds the list of threads who have donated to our thread>>
+struct thread* donated_to; <<this holds the thread that we have donated to, for continueing a donation chain>>
+
+>> B2: Explain the data structure used to track priority donation.
+
+See above, each thread holds a list of people who've donated to it, and
+drawing out the data structure would display a tree with many branches 
+going down a level, but one branch traversing up a level.
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+In the semaphore waiting list, we ensure order by using list_insert_ordered,
+which will insert all of our threads in decreasing order, meaning by popping
+the top of the list, we recieve the highest priority.
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+First, we check if the lock already has a holder. If it does, we then call
+thread_donate_priority() which checks if our current thread has a higher priority
+than the thread that holds the lock, if it does, then we save that thread as
+our current thread's donatee, update the lock holding thread's priority, and
+check if they have a donatee, if they do, we update that one recursively (so if that
+thread had a donatee, it would also be updated). After that, we wait for the lock.
+Upon recieving the lock, we set our donatee to NULL.
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+First, we check if anyone has donated to us (they'd be in the donaters list).
+If there is anyone who has donated, we then compare the donater list with those
+on the waiting list for the lock we are releasing, any matches are removed.
+After we have checked all threads in both lists, we then check for our highest
+priority among our donaters, check if that's higher than our default priority,
+and take the highest of the two.
+
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+A potential race could occur if the thread is internally changing its
+priority and the thread releases a lock that another (higher) thread
+is waiting for, wherein the higher thread tries to also change the
+thread's priority back to the next donated value or the original value
+(old_value). Our implementation avoids this problem by not changing
+the priority until after the lock has been released, where the thread is
+in charge of changing its own priority back (we use the thread_return_priority
+method internally in the thread to change its priority when the lock
+is released, so it will only be able to change its priority once at a
+time).
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+We chose this design based on the readability and ease of following the
+data for troubleshooting purposes. It is superior because it allowed the
+programmers (us) to better identify issues until it was functional; Also,
+the nested donation solution is lightweight, and the donation system is
+greatly scalable (to our understanding).
+
+
+              ADVANCED SCHEDULER [EXTRA CREDIT]
+              =================================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+---- ALGORITHMS ----
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
+>> has a recent_cpu value of 0.  Fill in the table below showing the
+>> scheduling decision and the priority and recent_cpu values for each
+>> thread after each given number of timer ticks:
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C   A   B   C   to run
+-----  --  --  --  --  --  --   ------
+ 0
+ 4
+ 8
+12
+16
+20
+24
+28
+32
+36
+
+>> C3: Did any ambiguities in the scheduler specification make values
+>> in the table uncertain?  If so, what rule did you use to resolve
+>> them?  Does this match the behavior of your scheduler?
+
+>> C4: How is the way you divided the cost of scheduling between code
+>> inside and outside interrupt context likely to affect performance?
+
+---- RATIONALE ----
+
+>> C5: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
