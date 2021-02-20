@@ -373,7 +373,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  thread_current ()->old_priority = new_priority;
+  if (thread_current ()->priority < new_priority || list_empty(&thread_current ()->donaters))
+  {
+    thread_current ()-> priority = new_priority;
+  }
   /* If the highest priority thread in the list is higher than the new running priority, the running thread yields. -SN */
   struct thread *top = list_entry(list_begin(&ready_list), struct thread, elem);
   if(new_priority < top->priority)
@@ -441,12 +445,12 @@ thread_return_priority(struct list* waiting)
     }
     if (list_empty(&this_thread->donaters))
     {
-      thread_set_priority(this_thread->old_priority);
+      this_thread->priority = this_thread->old_priority;
     }
     else
     {
-      thread_set_priority(list_entry(list_begin(&this_thread->donaters), struct thread, donateelem)
-                                  ->priority);
+      this_thread->priority = list_entry(list_begin(&this_thread->donaters), struct thread, donateelem)
+                                  ->priority;
     }
   }
 }
