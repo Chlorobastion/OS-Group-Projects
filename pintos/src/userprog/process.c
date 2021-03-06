@@ -28,6 +28,17 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  /* Get the words seperated by spaces in the file name. (Inspiration from strtok_r in string.c) -SN */
+  char *token, *save_ptr;
+  char *tokens[30]; // Is 30 a reasonable number? If not, feel free to adjust *DELETE ME BEFORE TURN-IN*
+  int i = 0;
+
+  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+        token = strtok_r (NULL, " ", &save_ptr));
+        tokens[i] = token;
+        i++;
+  /* This is the end of code that was inserted by me. -SN */
+
   char *fn_copy;
   tid_t tid;
 
