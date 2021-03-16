@@ -103,7 +103,6 @@ BOCHSAPI BX_CPU_C bx_cpu;
 BOCHSAPI BX_MEM_C bx_mem;
 
 char *bochsrc_filename = NULL;
-int jitter = 0;
 
 void bx_print_header()
 {
@@ -490,7 +489,6 @@ void print_usage(void)
     "  -n               no configuration file\n"
     "  -f configfile    specify configuration file\n"
     "  -q               quick start (skip configuration interface)\n"
-    "  -j n             jitter n\n"
     "  -benchmark n     run bochs in benchmark mode for millions of emulated ticks\n"
     "  -r path          restore the Bochs state from path\n"
     "  -log filename    specify Bochs log file name\n"
@@ -546,13 +544,6 @@ int bx_init_main(int argc, char *argv[])
     }
     else if (!strcmp("-q", argv[arg])) {
       SIM->get_param_enum(BXPN_BOCHS_START)->set(BX_QUICK_START);
-    }
-    else if (!strcmp("-j", argv[arg])) {
-      if (++arg >= argc) BX_PANIC(("-j must be followed by a number"));
-      else {
-        jitter = 1;
-        srand (atoi (argv[arg]));
-      }
     }
     else if (!strcmp("-log", argv[arg])) {
       if (++arg >= argc) BX_PANIC(("-log must be followed by a filename"));

@@ -609,6 +609,5 @@ void bx_center_print(FILE *file, const char *line, unsigned maxwidth);
 }
 
 #endif
-extern int jitter;
 
 #endif  /* BX_BOCHS_H */

@@ -49,7 +49,6 @@
 
 #include "iodev.h"
 #include "pit82c54.h"
-#include <stdlib.h>
 #define LOG_THIS this->
 
 
@@ -414,14 +413,7 @@ void BX_CPP_AttrRegparmN(1) pit_82C54::clock(Bit8u cnum)
       case 2:
         if (thisctr.count_written) {
           if (thisctr.triggerGATE || thisctr.first_pass) {
-//            set_count(thisctr, thisctr.inlatch);
-            unsigned n = thisctr.inlatch;
-            if (jitter && n > 5) {
-                n *= (double) rand() / RAND_MAX;
-                if (n < 5)
-                    n = 5;
-            }
-            set_count(thisctr, n);
+            set_count(thisctr, thisctr.inlatch);
             thisctr.next_change_time=(thisctr.count_binary-1) & 0xFFFF;
             thisctr.null_count=0;
             if (thisctr.inlatch==1) {
