@@ -29,6 +29,7 @@ tid_t
 process_execute (const char *file_name) 
 {
   /* Get the words seperated by spaces in the file name. (Inspiration from strtok_r in string.c) -SN */
+  /*
   char *token, *save_ptr;
   char *tokens[30]; // Is 30 a reasonable number? If not, feel free to adjust *DELETE ME BEFORE TURN-IN*
   int i = 0;
@@ -37,7 +38,12 @@ process_execute (const char *file_name)
         token = strtok_r (NULL, " ", &save_ptr));
         tokens[i] = token;
         i++;
+  */
   /* This is the end of code that was inserted by me. -SN */
+
+  char *name, *save_ptr;
+  name = strtok_r(file_name, " ", &save_ptr);
+
 
   char *fn_copy;
   tid_t tid;
@@ -448,7 +454,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 24; /* Remove the -24 after argument passing is implemented. -SN */
       else
         palloc_free_page (kpage);
     }
