@@ -44,9 +44,10 @@ process_execute (const char *file_name)
   char *name, *save_ptr;
   name = strtok_r(file_name, " ", &save_ptr);
 
-
   char *fn_copy;
   tid_t tid;
+  struct child_status *child;
+  struct thread *cur;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -56,9 +57,21 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (name, PRI_DEFAULT, start_process, save_ptr);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  else
+  {
+    cur = thread_current ();
+    child = calloc (1, sizeof *child);
+    if (child != NULL) 
+	  {
+	    child->child_id = tid;
+	    child->is_exit_called = false;
+	    child->has_been_waited = false;
+	    list_push_back (&cur->children, &child->elem_child_status);
+	  }
+  }
   return tid;
 }
 
@@ -93,19 +106,48 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
-/* Waits for thread TID to die and returns its exit status.  If
-   it was terminated by the kernel (i.e. killed due to an
-   exception), returns -1.  If TID is invalid or if it was not a
+/* If TID is invalid or if it was not a
    child of the calling process, or if process_wait() has already
    been successfully called for the given TID, returns -1
-   immediately, without waiting.
-
-   This function will be implemented in problem 2-2.  For now, it
-   does nothing. */
+   immediately, without waiting. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  int status;
+  struct thread *cur;
+  struct child_status *child = NULL;
+  struct list_elem *e;
+  if (child_tid != TID_ERROR)
+   {
+      cur = thread_current ();
+      e = list_tail (&cur->children);
+      while ((e = list_prev (e)) != list_head (&cur->children))
+      {
+        child = list_entry(e, struct child_status, elem_child_status);
+        if (child->child_id == child_tid)
+        break;
+      }
+
+      if (child == NULL)
+        status = -1;
+      else
+      {
+        lock_acquire(&cur->lock_child);
+        while (thread_get_by_id (child_tid) != NULL)
+          cond_wait (&cur->cond_child, &cur->lock_child);
+        if (!child->is_exit_called || child->has_been_waited)
+          status = -1; // Child needs to be dying to work properly. That's pretty dark
+        else
+        {
+          status = child->child_exit_status;
+          child->has_been_waited = true;
+        }
+        lock_release(&cur->lock_child);
+      }
+   }
+  else 
+    status = TID_ERROR;
+  return status;
 }
 
 /* Free the current process's resources. */
@@ -212,7 +254,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char *file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -319,7 +361,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, file_name))
     goto done;
 
   /* Start address. */
@@ -444,8 +486,102 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char *file_name)
 {
+  uint8_t *kpage;
+  bool success = false;
+
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);// = vm_allocate_frame (PAL_USER | PAL_ZERO); // this is from the cody jack implementation
+  if (kpage != NULL)
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      if (success) {
+  	    *esp = PHYS_BASE;
+
+        uint8_t *argstr_head;
+        char *cmd_name = thread_current ()->name;
+        int strlength, total_length;
+        int argc;
+
+        /*push the arguments string into stack*/
+        strlength = strlen(file_name) + 1;
+        *esp -= strlength;
+        memcpy(*esp, file_name, strlength);
+        total_length += strlength;
+
+        /*push command name into stack*/
+        strlength = strlen(cmd_name) + 1;
+        *esp -= strlength;
+        argstr_head = *esp;
+        memcpy(*esp, cmd_name, strlength);
+        total_length += strlength;
+
+        /*set alignment, get the starting address, modify *esp */
+        *esp -= 4 - total_length % 4;
+
+        /* push argv[argc] null into the stack */
+        *esp -= 4;
+        * (uint32_t *) *esp = (uint32_t) NULL;
+
+        /* scan throught the file name with arguments string downward,
+         * using the cur_addr and total_length above to define boundary.
+         * omitting the beginning space or '\0', but for every encounter
+         * after, push the last non-space-and-'\0' address, which is current
+         * address minus 1, as one of argv to the stack, and set the space to
+         * '\0', multiple adjancent spaces and '0' is treated as one.
+         */
+        int i = total_length - 1;
+        /*omitting the starting space and '\0' */
+        while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
+        {
+          if (*(argstr_head + i) == ' ')
+            {
+              *(argstr_head + i) = '\0';
+            }
+          i--;
+        }
+
+        /*scan through args string, push args address into stack*/
+        char *mark;
+        for (mark = (char *)(argstr_head + i); i > 0;
+             i--, mark = (char*)(argstr_head+i))
+          {
+            /*detect args, if found, push it's address to stack*/
+            if ( (*mark == '\0' || *mark == ' ') &&
+                 (*(mark+1) != '\0' && *(mark+1) != ' '))
+              {
+                *esp -= 4;
+                * (uint32_t *) *esp = (uint32_t) mark + 1;
+                argc++;
+              }
+            /*set space to '\0', so that each arg string will terminate*/
+            if (*mark == ' ')
+              *mark = '\0';
+          }
+
+        /*push one more arg, which is the command name, into stack*/
+        *esp -= 4;
+        * (uint32_t *) *esp = (uint32_t) argstr_head;
+        argc++;
+
+        /*push argv*/
+        * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
+        *esp -= 4;
+
+        /*push argc*/
+        *esp -= 4;
+        * (int *) *esp = argc;
+
+        /*push return address*/
+        *esp -= 4;
+        * (uint32_t *) *esp = 0x0;
+      } 
+      else
+        palloc_free_page (kpage);//vm_free_frame (kpage); // Also from the cody jack implementation
+    }
+    hex_dump((uintptr_t)*esp, *esp, sizeof(char)*8, true); // Used for debugging
+  return success;
+  /*
   uint8_t *kpage;
   bool success = false;
 
@@ -454,11 +590,12 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 24; /* Remove the -24 after argument passing is implemented. -SN */
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
   return success;
+  */
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
