@@ -488,100 +488,100 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp, char *file_name)
 {
-  uint8_t *kpage;
-  bool success = false;
+  // uint8_t *kpage;
+  // bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);// = vm_allocate_frame (PAL_USER | PAL_ZERO); // this is from the cody jack implementation
-  if (kpage != NULL)
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success) {
-  	    *esp = PHYS_BASE;
+  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);// = vm_allocate_frame (PAL_USER | PAL_ZERO); // this is from the cody jack implementation
+  // if (kpage != NULL)
+  //   {
+  //     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+  //     if (success) {
+  // 	    *esp = PHYS_BASE;
 
-        uint8_t *argstr_head;
-        char *cmd_name = thread_current ()->name;
-        int strlength, total_length;
-        int argc;
+  //       uint8_t *argstr_head;
+  //       char *cmd_name = thread_current ()->name;
+  //       int strlength, total_length;
+  //       int argc;
 
-        /*push the arguments string into stack*/
-        strlength = strlen(file_name) + 1;
-        *esp -= strlength;
-        memcpy(*esp, file_name, strlength);
-        total_length += strlength;
+  //       /*push the arguments string into stack*/
+  //       strlength = strlen(file_name) + 1;
+  //       *esp -= strlength;
+  //       memcpy(*esp, file_name, strlength);
+  //       total_length += strlength;
 
-        /*push command name into stack*/
-        strlength = strlen(cmd_name) + 1;
-        *esp -= strlength;
-        argstr_head = *esp;
-        memcpy(*esp, cmd_name, strlength);
-        total_length += strlength;
+  //       /*push command name into stack*/
+  //       strlength = strlen(cmd_name) + 1;
+  //       *esp -= strlength;
+  //       argstr_head = *esp;
+  //       memcpy(*esp, cmd_name, strlength);
+  //       total_length += strlength;
 
-        /*set alignment, get the starting address, modify *esp */
-        *esp -= 4 - total_length % 4;
+  //       /*set alignment, get the starting address, modify *esp */
+  //       *esp -= 4 - total_length % 4;
 
-        /* push argv[argc] null into the stack */
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) NULL;
+  //       /* push argv[argc] null into the stack */
+  //       *esp -= 4;
+  //       * (uint32_t *) *esp = (uint32_t) NULL;
 
-        /* scan throught the file name with arguments string downward,
-         * using the cur_addr and total_length above to define boundary.
-         * omitting the beginning space or '\0', but for every encounter
-         * after, push the last non-space-and-'\0' address, which is current
-         * address minus 1, as one of argv to the stack, and set the space to
-         * '\0', multiple adjancent spaces and '0' is treated as one.
-         */
-        int i = total_length - 1;
-        /*omitting the starting space and '\0' */
-        while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
-        {
-          if (*(argstr_head + i) == ' ')
-            {
-              *(argstr_head + i) = '\0';
-            }
-          i--;
-        }
+  //       /* scan throught the file name with arguments string downward,
+  //        * using the cur_addr and total_length above to define boundary.
+  //        * omitting the beginning space or '\0', but for every encounter
+  //        * after, push the last non-space-and-'\0' address, which is current
+  //        * address minus 1, as one of argv to the stack, and set the space to
+  //        * '\0', multiple adjancent spaces and '0' is treated as one.
+  //        */
+  //       int i = total_length - 1;
+  //       /*omitting the starting space and '\0' */
+  //       while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
+  //       {
+  //         if (*(argstr_head + i) == ' ')
+  //           {
+  //             *(argstr_head + i) = '\0';
+  //           }
+  //         i--;
+  //       }
 
-        /*scan through args string, push args address into stack*/
-        char *mark;
-        for (mark = (char *)(argstr_head + i); i > 0;
-             i--, mark = (char*)(argstr_head+i))
-          {
-            /*detect args, if found, push it's address to stack*/
-            if ( (*mark == '\0' || *mark == ' ') &&
-                 (*(mark+1) != '\0' && *(mark+1) != ' '))
-              {
-                *esp -= 4;
-                * (uint32_t *) *esp = (uint32_t) mark + 1;
-                argc++;
-              }
-            /*set space to '\0', so that each arg string will terminate*/
-            if (*mark == ' ')
-              *mark = '\0';
-          }
+  //       /*scan through args string, push args address into stack*/
+  //       char *mark;
+  //       for (mark = (char *)(argstr_head + i); i > 0;
+  //            i--, mark = (char*)(argstr_head+i))
+  //         {
+  //           /*detect args, if found, push it's address to stack*/
+  //           if ( (*mark == '\0' || *mark == ' ') &&
+  //                (*(mark+1) != '\0' && *(mark+1) != ' '))
+  //             {
+  //               *esp -= 4;
+  //               * (uint32_t *) *esp = (uint32_t) mark + 1;
+  //               argc++;
+  //             }
+  //           /*set space to '\0', so that each arg string will terminate*/
+  //           if (*mark == ' ')
+  //             *mark = '\0';
+  //         }
 
-        /*push one more arg, which is the command name, into stack*/
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) argstr_head;
-        argc++;
+  //       /*push one more arg, which is the command name, into stack*/
+  //       *esp -= 4;
+  //       * (uint32_t *) *esp = (uint32_t) argstr_head;
+  //       argc++;
 
-        /*push argv*/
-        * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
-        *esp -= 4;
+  //       /*push argv*/
+  //       * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
+  //       *esp -= 4;
 
-        /*push argc*/
-        *esp -= 4;
-        * (int *) *esp = argc;
+  //       /*push argc*/
+  //       *esp -= 4;
+  //       * (int *) *esp = argc;
 
-        /*push return address*/
-        *esp -= 4;
-        * (uint32_t *) *esp = 0x0;
-      } 
-      else
-        palloc_free_page (kpage);//vm_free_frame (kpage); // Also from the cody jack implementation
-    }
-    hex_dump((uintptr_t)*esp, *esp, sizeof(char)*8, true); // Used for debugging
-  return success;
-  /*
+  //       /*push return address*/
+  //       *esp -= 4;
+  //       * (uint32_t *) *esp = 0x0;
+  //     } 
+  //     else
+  //       palloc_free_page (kpage);//vm_free_frame (kpage); // Also from the cody jack implementation
+  //   }
+  //   hex_dump((uintptr_t)*esp, *esp, sizeof(char)*8, true); // Used for debugging
+  // return success;
+  
   uint8_t *kpage;
   bool success = false;
 
@@ -590,12 +590,12 @@ setup_stack (void **esp, char *file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 24;
       else
         palloc_free_page (kpage);
     }
   return success;
-  */
+  
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel

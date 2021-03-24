@@ -350,6 +350,22 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+void
+thread_yield_current (struct thread *cur) 
+{
+  ASSERT(is_thread(cur));
+  enum intr_level old_level;
+  
+  ASSERT (!intr_context ());
+
+  old_level = intr_disable ();
+  if (cur != idle_thread) 
+    list_insert_ordered(&ready_list, &cur->elem, thread_higher_priority, NULL); // Inserts into ready list in order of high to low priority - AM
+  cur->status = THREAD_READY;
+  schedule ();
+  intr_set_level (old_level);
+}
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -583,6 +599,16 @@ init_thread (struct thread *t, const char *name, int priority)
   t->donated_to = NULL;
   t->magic = THREAD_MAGIC;
 
+  #ifdef USERPROG
+    t->child_load_status = 0;
+    lock_init(&t->lock_child);
+    cond_init(&t->cond_child);
+
+    list_init(&t->children);
+
+    t->mapid_allocator = 0;
+  #endif
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -740,4 +766,20 @@ thread_wake_up (int64_t current_time)
         else e = list_next(e);
       }
   }
+}
+
+struct thread
+*thread_get_by_id(tid_t id)
+{
+  ASSERT(id != TID_ERROR);
+  struct list_elem *e;
+  struct thread *t;
+  e = list_tail(&all_list);
+  while((e = list_prev(e) != list_head(&all_list)))
+  {
+    t = list_entry(e, struct thread, allelem);
+    if(t->tid == id && t->status != THREAD_DYING)
+      return t; // We found the thread and it is still going!
+  }
+  return NULL; // We did not find the thread
 }

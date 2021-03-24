@@ -4,9 +4,16 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "userprog/pagedir.h"
+#include "devices/input.h"
+#include "vm/page.h"
+
+/* Process identifier. */
+typedef int pid_t;
+#define PID_ERROR ((pid_t) -1)
 
 /* System call functions */
 static void halt (void);
@@ -38,7 +45,7 @@ struct file_descriptor
   tid_t owner;
   struct file *file_struct;
   struct list_elem elem;
-}
+};
 
 static uint32_t *esp;
 
@@ -88,9 +95,9 @@ syscall_handler (struct intr_frame *f)
       case SYS_FILESIZE:
 	      f->eax = filesize (*(esp + 1));
 	      break;
-      //case SYS_READ:
-      //  f->eax = read (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
-      //  break;
+      case SYS_READ:
+        f->eax = read (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
+        break;
       case SYS_WRITE:
         f->eax = write (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
         break;
@@ -241,8 +248,6 @@ int filesize(int fd)
   return status;
 }
 
-/*
-// COME BACK TO READ TO UNDERSTAND AFTER FIXING HASH TABLE STUFF
 int read(int fd, void *buffer, unsigned size)
 {
   struct file_descriptor *fd_struct;
@@ -260,7 +265,7 @@ int read(int fd, void *buffer, unsigned size)
     if (pagedir_get_page (t->pagedir, buffer_tmp) == NULL)   
 	  {
 	    struct suppl_pte *spte;
-	    spte = get_suppl_pte (&t->suppl_page_table, pg_round_down (buffer_tmp)); // HASH TABLE STUFF??? FIX ME
+	    spte = get_suppl_pte (&t->suppl_page_table, pg_round_down (buffer_tmp));
 	    if (spte != NULL && !spte->is_loaded)
 	      load_page (spte);
       else if (spte == NULL && buffer_tmp >= (esp - 32))
@@ -314,7 +319,6 @@ int read(int fd, void *buffer, unsigned size)
   lock_release (&fs_lock);
   return status;
 }
-*/
 
 int write(int fd, const void *buffer, unsigned size)
 {
@@ -398,7 +402,25 @@ void close(int fd)
   lock_acquire (&fs_lock); 
   fd_struct = get_open_file (fd);
   if (fd_struct != NULL && fd_struct->owner == thread_current ()->tid)
-    close_open_file (fd); // Use file closing given by Pintos
+  {
+    struct list_elem *e;
+    struct list_elem *prev;
+    struct file_descriptor *fd_struct;
+    e = list_end(&open_files);
+    while((e = list_prev(e)) != list_head(&open_files))
+    {
+      prev = list_prev(e);
+      fd_struct = list_entry(e, struct file_descriptor, elem);
+      if(fd_struct->fd_num == fd)
+      {
+        list_remove(e);
+        file_close(fd_struct->file_struct);
+        free(fd_struct);
+        break;
+      }
+      e = prev;
+    }
+  }
   lock_release (&fs_lock);
   return;
 }

@@ -5,6 +5,9 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "lib/kernel/hash.h"
+
+typedef int mapid_t;
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -105,11 +108,45 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    tid_t parent_id;                    /* parent thread id */
+ 
+    /* signal to indicate the child's executable-loading status:
+     *  - 0: has not been loaded
+     *  - -1: load failed
+     *  - 1: load success*/
+    int child_load_status;
+    
+    /* monitor used to wait the child, owned by wait-syscall and waiting
+       for child to load executable */
+    struct lock lock_child;
+    struct condition cond_child;
+ 
+    /* list of children, which should be a list of struct child_status */
+    struct list children; 
+
+    /* file struct represents the execuatable of the current thread */ 
+    struct file *exec_file;
+
+    /* supplemental page table, which stores as hash table */
+    struct hash suppl_page_table;
+    
+    /* Memory Mapped Files table */
+    mapid_t mapid_allocator;
+    struct hash mmfiles; 
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+struct child_status
+{
+   tid_t child_id;
+   bool is_exit_called;
+   bool has_been_waited;
+   int child_exit_status;
+   struct list_elem elem_child_status;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -134,6 +171,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_yield_current(struct thread *);
 bool thread_higher_priority (const struct list_elem *,const struct list_elem *,void *);
 bool thread_higher_donate_priority (const struct list_elem *,const struct list_elem *, void *);
 /* Performs some operation on thread t, given auxiliary data AUX. */
@@ -154,4 +192,5 @@ int thread_get_load_avg (void);
 void thread_sleep (int64_t);
 void thread_wake_up (int64_t);
 
+struct thread * thread_get_by_id(tid_t);
 #endif /* threads/thread.h */
