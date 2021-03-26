@@ -285,7 +285,6 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
-
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
@@ -464,6 +463,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  #ifdef USERPROG
+  t->child_load_status = 0;
+  lock_init (&t->lock_child);
+  cond_init (&t->cond_child);
+  list_init (&t->children);
+  #endif
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -582,3 +588,20 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* Get the thread by its tid */
+struct thread
+*thread_get_by_id (tid_t id)
+{
+  ASSERT (id != TID_ERROR);
+  struct list_elem *e;
+  struct thread *t;
+  e = list_tail (&all_list);
+  while ((e = list_prev (e)) != list_head (&all_list))
+    {
+      t = list_entry (e, struct thread, allelem);
+      if (t->tid == id && t->status != THREAD_DYING)
+        return t;
+    }
+  return NULL;
+}

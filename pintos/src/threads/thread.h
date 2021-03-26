@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -12,6 +14,34 @@ enum thread_status
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
+  };
+
+  /* Thread identifier type.
+   You can redefine this to whatever type you like. */
+   typedef int tid_t;
+   #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
+
+  struct child_status
+  {
+      tid_t child_id;
+      bool is_exit_called;
+      bool has_been_waited;
+      int child_exit_status;
+      struct list_elem elem_child_status;
+   };
+
+
+/* A struct to keep track of a thread's children's information,
+ * inclduing exit status, if it is terminated by kernel, and
+ * if process_wait has been called successfully
+ */
+struct waiting_child
+  {
+    tid_t child_id;                          // thread_id
+    int child_exit_status;
+    bool is_terminated_by_kernel;
+    bool has_been_waited;
+    struct list_elem elem_waiting_child;     // itself
   };
 
 /* Thread identifier type.
@@ -96,6 +126,24 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    tid_t parent_id;                    /* parent thread id */
+ 
+    /* signal to indicate the child's executable-loading status:
+     *  - 0: has not been loaded
+     *  - -1: load failed
+     *  - 1: load success*/
+    int child_load_status;
+    
+    /* monitor used to wait the child, owned by wait-syscall and waiting
+       for child to load executable */
+    struct lock lock_child;
+    struct condition cond_child;
+ 
+    /* list of children, which should be a list of struct child_status */
+    struct list children;
+
+    /* file struct represents the execuatable of the current thread */ 
+    struct file *exec_file;
 #endif
 
     /* Owned by thread.c. */
@@ -137,5 +185,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+/* get a thread by it's id */
+struct thread * thread_get_by_id (tid_t);
 
 #endif /* threads/thread.h */
