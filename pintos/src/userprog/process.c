@@ -31,6 +31,8 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  // Debugging -SN
+  printf("Start in process_execute!\n");
   char *fn_copy;
   tid_t tid;
   struct child_status *child; 
@@ -61,13 +63,15 @@ process_execute (const char *file_name)
       cur = thread_current ();
       child = calloc (1, sizeof *child);
       if (child != NULL) 
-	{
-	  child->child_id = tid;
-	  child->is_exit_called = false;
-	  child->has_been_waited = false;
-	  list_push_back(&cur->children, &child->elem_child_status);
-	}
+      {
+        child->child_id = tid;
+        child->is_exit_called = false;
+        child->has_been_waited = false;
+        list_push_back(&cur->children, &child->elem_child_status);
+      }
     }
+  // Debugging -SN
+  printf("End in process_execute!\n");
   return tid;
 }
 
@@ -138,6 +142,8 @@ int
 /* process_wait (tid_t child_tid UNUSED) */
 process_wait (tid_t child_tid)
 {
+  // Debugging -SN
+  printf("Start in process_wait!\n");
   int status;
   struct thread *cur;
   struct child_status *child = NULL;
@@ -157,6 +163,8 @@ process_wait (tid_t child_tid)
        status = -1;
      else
        {
+         // Debugging -SN
+         printf("About to acquire lock in process.wait!\n");
          lock_acquire(&cur->lock_child);
          while (thread_get_by_id (child_tid) != NULL)
            cond_wait (&cur->cond_child, &cur->lock_child);
@@ -172,6 +180,8 @@ process_wait (tid_t child_tid)
    }
   else 
     status = TID_ERROR;
+  // Debugging -SN
+  printf("End in process_wait!\n");
   return status;
 }
 
