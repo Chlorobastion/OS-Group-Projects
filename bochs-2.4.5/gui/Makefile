@@ -19,7 +19,7 @@
 
 .SUFFIXES: .cc
 
-prefix          = /home/n/neal01/cis520/usr/local
+prefix          = /homes/lmfalk/proj2/usr/local
 exec_prefix     = ${prefix}
 srcdir          = .
 
@@ -68,7 +68,7 @@ OBJS_THAT_CANNOT_BE_PLUGINS = keymap.o gui.o siminterface.o textconfig.o enh_dbg
 OBJS_THAT_CAN_BE_PLUGINS = 
 
 X_LIBS = 
-X_PRE_LIBS =  -lSM -lICE
+X_PRE_LIBS = 
 GUI_LINK_OPTS_X = $(X_LIBS) $(X_PRE_LIBS) -lX11 -lXpm
 GUI_LINK_OPTS_SDL = `sdl-config --cflags --libs`
 GUI_LINK_OPTS_SVGA =  -lvga -lvgagl

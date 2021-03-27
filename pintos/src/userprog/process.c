@@ -561,15 +561,20 @@ setup_stack (void **esp, const char *file_name)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-  	*esp = PHYS_BASE;
+  	    *esp = PHYS_BASE;
+
+        const int DEFAULT_ARGV = 2;
+        char* token;
+        char** argv = malloc(DEFAULT_ARGV*sizeof(char*));
+        char** cont = malloc(DEFAULT_ARGV*sizeof(char*));
 
         uint8_t *argstr_head;
         char *cmd_name = thread_current ()->name;
         int strlength, total_length;
         int argc;
 
-        /*push the arguments string into stack*/
-        strlength = strlen(file_name) + 1;
+        /*push the arguments string into stack*/ // STEP 1/2: PARSE ARGS AND PUSH ONTO STACK, REVERSE
+        strlength = strlen(file_name);
         *esp -= strlength;
         memcpy(*esp, file_name, strlength);
         total_length += strlength;
@@ -581,7 +586,7 @@ setup_stack (void **esp, const char *file_name)
         memcpy(*esp, cmd_name, strlength);
         total_length += strlength;
 
-        /*set alignment, get the starting address, modify *esp */
+        /*set alignment, get the starting address, modify *esp */ // STEP 3: WORD ALIGN
         *esp -= 4 - total_length % 4;
 
         /* push argv[argc] null into the stack */
@@ -616,6 +621,7 @@ setup_stack (void **esp, const char *file_name)
                  (*(mark+1) != '\0' && *(mark+1) != ' '))
               {
                 *esp -= 4;
+                total_length += 4;
                 * (uint32_t *) *esp = (uint32_t) mark + 1;
                 argc++;
               }
@@ -626,20 +632,27 @@ setup_stack (void **esp, const char *file_name)
 
         /*push one more arg, which is the command name, into stack*/
         *esp -= 4;
+        total_length += 4;
         * (uint32_t *) *esp = (uint32_t) argstr_head;
         argc++;
 
         /*push argv*/
         * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
         *esp -= 4;
+        total_length += 4;
 
         /*push argc*/
         *esp -= 4;
+        total_length += 4;
         * (int *) *esp = argc;
 
         /*push return address*/
         *esp -= 4;
+        total_length += 8;
         * (uint32_t *) *esp = 0x0;
+
+        total_length += 4 - total_length % 4;
+        hex_dump((uintptr_t) *esp, *esp, total_length, true);
       } else
         palloc_free_page (kpage);
     }

@@ -149,6 +149,7 @@ exit (int status)
           }
         }
     }
+  printf("Thread will now exit");
   thread_exit ();
 }
 

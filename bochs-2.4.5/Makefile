@@ -19,7 +19,7 @@
 # the following rules:
 #   use $(VAR) not ${VAR}
 
-prefix          = /home/n/neal01/cis520/usr/local
+prefix          = /homes/lmfalk/proj2/usr/local
 exec_prefix     = ${prefix}
 srcdir          = .
 
@@ -94,7 +94,7 @@ LIBS =  -lm
 #   linux needs just -lreadline
 #   solaris needs -lreadline -lcurses
 X_LIBS = 
-X_PRE_LIBS =  -lSM -lICE
+X_PRE_LIBS = 
 XPM_LIB = 
 GUI_LINK_OPTS_X = $(X_LIBS) $(X_PRE_LIBS) -lX11 $(XPM_LIB)
 GUI_LINK_OPTS_SDL = `sdl-config --cflags --libs`
