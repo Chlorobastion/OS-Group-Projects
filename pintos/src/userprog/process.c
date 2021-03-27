@@ -171,7 +171,7 @@ process_wait (tid_t child_tid)
          {
            // Debugging -SN
            //printf("Child still around...\n");
-           //cond_wait (&cur->cond_child, &cur->lock_child);
+           cond_wait (&cur->cond_child, &cur->lock_child);
          }
          // Debugging -SN
          //printf("Break out of loop!\n");
@@ -574,107 +574,176 @@ setup_stack (void **esp, const char *file_name)
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
+  if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success) {
-  	    *esp = PHYS_BASE;
-
-        const int DEFAULT_ARGV = 2;
-        char* token;
-        char** argv = malloc(DEFAULT_ARGV*sizeof(char*));
-        char** cont = malloc(DEFAULT_ARGV*sizeof(char*));
-
-        uint8_t *argstr_head;
-        char *cmd_name = thread_current ()->name;
-        char *full_name = thread_current ()->cmd_line;
-        int strlength, total_length;
-        int argc;
-
-        /*push the arguments string into stack*/ // STEP 1/2: PARSE ARGS AND PUSH ONTO STACK, REVERSE
-        strlength = strlen(full_name);
-        *esp -= strlength;
-        memcpy(*esp, file_name, strlength);
-        total_length += strlength;
-
-        /*push command name into stack*/
-        strlength = strlen(cmd_name) + 1;
-        *esp -= strlength;
-        argstr_head = *esp;
-        memcpy(*esp, cmd_name, strlength);
-        total_length += strlength;
-
-        /*set alignment, get the starting address, modify *esp */ // STEP 3: WORD ALIGN
-        *esp -= 4 - total_length % 4;
-
-        /* push argv[argc] null into the stack */
-        *esp -= 4;
-        * (uint32_t *) *esp = (uint32_t) NULL;
-
-        /* scan throught the file name with arguments string downward,
-         * using the cur_addr and total_length above to define boundary.
-         * omitting the beginning space or '\0', but for every encounter
-         * after, push the last non-space-and-'\0' address, which is current
-         * address minus 1, as one of argv to the stack, and set the space to
-         * '\0', multiple adjancent spaces and '0' is treated as one.
-         */
-        int i = total_length - 1;
-        /*omitting the starting space and '\0' */
-        while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
-          {
-            if (*(argstr_head + i) == ' ')
-              {
-                *(argstr_head + i) = '\0';
-              }
-            i--;
-          }
-
-        /*scan through args string, push args address into stack*/
-        char *mark;
-        for (mark = (char *)(argstr_head + i); i > 0;
-             i--, mark = (char*)(argstr_head+i))
-          {
-            /*detect args, if found, push it's address to stack*/
-            if ( (*mark == '\0' || *mark == ' ') &&
-                 (*(mark+1) != '\0' && *(mark+1) != ' '))
-              {
-                *esp -= 4;
-                total_length += 4;
-                * (uint32_t *) *esp = (uint32_t) mark + 1;
-                argc++;
-              }
-            /*set space to '\0', so that each arg string will terminate*/
-            if (*mark == ' ')
-              *mark = '\0';
-          }
-
-        /*push one more arg, which is the command name, into stack*/
-        *esp -= 4;
-        total_length += 4;
-        * (uint32_t *) *esp = (uint32_t) argstr_head;
-        argc++;
-
-        /*push argv*/
-        * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
-        *esp -= 4;
-        total_length += 4;
-
-        /*push argc*/
-        *esp -= 4;
-        total_length += 4;
-        * (int *) *esp = argc;
-
-        /*push return address*/
-        *esp -= 4;
-        total_length += 8;
-        * (uint32_t *) *esp = 0x0;
-
-        total_length += 4 - total_length % 4;
-        //hex_dump((uintptr_t) *esp, *esp, total_length, true);
-      } else
+      if (success)
+        *esp = PHYS_BASE;
+      else
         palloc_free_page (kpage);
     }
+  char *full_name = thread_current ()->cmd_line;
+  char *token, *save_ptr;
+  int argc = 0,i;
+
+  char * copy = malloc(strlen(full_name)+1);
+  strlcpy (copy, full_name, strlen(full_name)+1);
+
+
+  for (token = strtok_r (copy, " ", &save_ptr); token != NULL;
+    token = strtok_r (NULL, " ", &save_ptr))
+    argc++;
+
+
+  int *argv = calloc(argc,sizeof(int));
+
+  for (token = strtok_r (full_name, " ", &save_ptr),i=0; token != NULL;
+    token = strtok_r (NULL, " ", &save_ptr),i++)
+    {
+      *esp -= strlen(token) + 1;
+      memcpy(*esp,token,strlen(token) + 1);
+
+      argv[i]=*esp;
+    }
+
+  while((int)*esp%4!=0)
+  {
+    *esp-=sizeof(char);
+    char x = 0;
+    memcpy(*esp,&x,sizeof(char));
+  }
+
+  int zero = 0;
+
+  *esp-=sizeof(int);
+  memcpy(*esp,&zero,sizeof(int));
+
+  for(i=argc-1;i>=0;i--)
+  {
+    *esp-=sizeof(int);
+    memcpy(*esp,&argv[i],sizeof(int));
+  }
+
+  int pt = *esp;
+  *esp-=sizeof(int);
+  memcpy(*esp,&pt,sizeof(int));
+
+  *esp-=sizeof(int);
+  memcpy(*esp,&argc,sizeof(int));
+
+  *esp-=sizeof(int);
+  memcpy(*esp,&zero,sizeof(int));
+
+  free(copy);
+  free(argv);
+
   return success;
+  
+  // uint8_t *kpage;
+  // bool success = false;
+
+  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  // if (kpage != NULL)
+  //   {
+  //     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+  //     if (success) {
+  // 	    *esp = PHYS_BASE;
+
+  //       const int DEFAULT_ARGV = 2;
+  //       char* token;
+  //       char** argv = malloc(DEFAULT_ARGV*sizeof(char*));
+  //       char** cont = malloc(DEFAULT_ARGV*sizeof(char*));
+
+  //       uint8_t *argstr_head;
+  //       char *cmd_name = thread_current ()->name;
+  //       char *full_name = thread_current ()->cmd_line;
+  //       int strlength, total_length;
+  //       int argc;
+
+  //       /*push the arguments string into stack*/ // STEP 1/2: PARSE ARGS AND PUSH ONTO STACK, REVERSE
+  //       strlength = strlen(full_name);
+  //       *esp -= strlength;
+  //       memcpy(*esp, file_name, strlength);
+  //       total_length += strlength;
+
+  //       /*push command name into stack*/
+  //       strlength = strlen(cmd_name) + 1;
+  //       *esp -= strlength;
+  //       argstr_head = *esp;
+  //       memcpy(*esp, cmd_name, strlength);
+  //       total_length += strlength;
+
+  //       /*set alignment, get the starting address, modify *esp */ // STEP 3: WORD ALIGN
+  //       *esp -= 4 - total_length % 4;
+
+  //       /* push argv[argc] null into the stack */
+  //       *esp -= 4;
+  //       * (uint32_t *) *esp = (uint32_t) NULL;
+
+  //       /* scan throught the file name with arguments string downward,
+  //        * using the cur_addr and total_length above to define boundary.
+  //        * omitting the beginning space or '\0', but for every encounter
+  //        * after, push the last non-space-and-'\0' address, which is current
+  //        * address minus 1, as one of argv to the stack, and set the space to
+  //        * '\0', multiple adjancent spaces and '0' is treated as one.
+  //        */
+  //       int i = total_length - 1;
+  //       /*omitting the starting space and '\0' */
+  //       while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
+  //         {
+  //           if (*(argstr_head + i) == ' ')
+  //             {
+  //               *(argstr_head + i) = '\0';
+  //             }
+  //           i--;
+  //         }
+
+  //       /*scan through args string, push args address into stack*/
+  //       char *mark;
+  //       for (mark = (char *)(argstr_head + i); i > 0;
+  //            i--, mark = (char*)(argstr_head+i))
+  //         {
+  //           /*detect args, if found, push it's address to stack*/
+  //           if ( (*mark == '\0' || *mark == ' ') &&
+  //                (*(mark+1) != '\0' && *(mark+1) != ' '))
+  //             {
+  //               *esp -= 4;
+  //               total_length += 4;
+  //               * (uint32_t *) *esp = (uint32_t) mark + 1;
+  //               argc++;
+  //             }
+  //           /*set space to '\0', so that each arg string will terminate*/
+  //           if (*mark == ' ')
+  //             *mark = '\0';
+  //         }
+
+  //       /*push one more arg, which is the command name, into stack*/
+  //       *esp -= 4;
+  //       total_length += 4;
+  //       * (uint32_t *) *esp = (uint32_t) argstr_head;
+  //       argc++;
+
+  //       /*push argv*/
+  //       * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
+  //       *esp -= 4;
+  //       total_length += 4;
+
+  //       /*push argc*/
+  //       *esp -= 4;
+  //       total_length += 4;
+  //       * (int *) *esp = argc;
+
+  //       /*push return address*/
+  //       *esp -= 4;
+  //       total_length += 8;
+  //       * (uint32_t *) *esp = 0x0;
+
+  //       total_length += 4 - total_length % 4;
+  //       //hex_dump((uintptr_t) *esp, *esp, total_length, true);
+  //     } else
+  //       palloc_free_page (kpage);
+  //   }
+  // return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
