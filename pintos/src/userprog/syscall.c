@@ -150,7 +150,7 @@ exit (int status)
         }
     }
   // Debugging -LF
-  printf("Thread will now exit\n");
+  //printf("Thread will now exit\n");
   thread_exit ();
 }
 

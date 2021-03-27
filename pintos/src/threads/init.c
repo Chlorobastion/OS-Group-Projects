@@ -285,7 +285,7 @@ run_task (char **argv)
   
   printf ("Executing '%s':\n", task);
   // Debugging -SN
-  printf("We are in init.c!\n");
+  //printf("We are in init.c!\n");
 #ifdef USERPROG
   process_wait (process_execute (task));
 #else

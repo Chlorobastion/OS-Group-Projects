@@ -144,6 +144,8 @@ struct thread
 
     /* file struct represents the execuatable of the current thread */ 
     struct file *exec_file;
+
+    char *cmd_line;
 #endif
 
     /* Owned by thread.c. */

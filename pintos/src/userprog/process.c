@@ -32,7 +32,7 @@ tid_t
 process_execute (const char *file_name) 
 {
   // Debugging -SN
-  printf("Start in process_execute!\n");
+  //printf("Start in process_execute!\n");
   char *fn_copy;
   tid_t tid;
   struct child_status *child; 
@@ -56,6 +56,7 @@ process_execute (const char *file_name)
    * args points to " argone"
    */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, args);
+  thread_get_by_id(tid)->cmd_line = file_name;
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   else 
@@ -71,7 +72,7 @@ process_execute (const char *file_name)
       }
     }
   // Debugging -SN
-  printf("End in process_execute!\n");
+  //printf("End in process_execute!\n");
   return tid;
 }
 
@@ -143,7 +144,7 @@ int
 process_wait (tid_t child_tid)
 {
   // Debugging -SN
-  printf("Start in process_wait!\n");
+  //printf("Start in process_wait!\n");
   int status;
   struct thread *cur;
   struct child_status *child = NULL;
@@ -164,10 +165,16 @@ process_wait (tid_t child_tid)
      else
        {
          // Debugging -SN
-         printf("About to acquire lock in process.wait!\n");
+         //printf("About to acquire lock in process.wait!\n");
          lock_acquire(&cur->lock_child);
          while (thread_get_by_id (child_tid) != NULL)
-           cond_wait (&cur->cond_child, &cur->lock_child);
+         {
+           // Debugging -SN
+           //printf("Child still around...\n");
+           //cond_wait (&cur->cond_child, &cur->lock_child);
+         }
+         // Debugging -SN
+         //printf("Break out of loop!\n");
          if (!child->is_exit_called || child->has_been_waited)
            status = -1;
          else
@@ -181,7 +188,7 @@ process_wait (tid_t child_tid)
   else 
     status = TID_ERROR;
   // Debugging -SN
-  printf("End in process_wait!\n");
+  //printf("End in process_wait!\n");
   return status;
 }
 
@@ -235,7 +242,7 @@ process_exit (void)
     {
       lock_acquire (&parent->lock_child);
       if (parent->child_load_status == 0)
-	parent->child_load_status = -1;
+	      parent->child_load_status = -1;
       cond_signal (&parent->cond_child, &parent->lock_child);
       lock_release (&parent->lock_child);
     }
@@ -580,11 +587,12 @@ setup_stack (void **esp, const char *file_name)
 
         uint8_t *argstr_head;
         char *cmd_name = thread_current ()->name;
+        char *full_name = thread_current ()->cmd_line;
         int strlength, total_length;
         int argc;
 
         /*push the arguments string into stack*/ // STEP 1/2: PARSE ARGS AND PUSH ONTO STACK, REVERSE
-        strlength = strlen(file_name);
+        strlength = strlen(full_name);
         *esp -= strlength;
         memcpy(*esp, file_name, strlength);
         total_length += strlength;
@@ -662,7 +670,7 @@ setup_stack (void **esp, const char *file_name)
         * (uint32_t *) *esp = 0x0;
 
         total_length += 4 - total_length % 4;
-        hex_dump((uintptr_t) *esp, *esp, total_length, true);
+        //hex_dump((uintptr_t) *esp, *esp, total_length, true);
       } else
         palloc_free_page (kpage);
     }
