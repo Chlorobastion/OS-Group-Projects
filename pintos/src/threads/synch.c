@@ -297,7 +297,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   sema_init (&waiter.semaphore, 0);
   list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
-  //sema_down (&waiter.semaphore);
+  sema_down (&waiter.semaphore);
   lock_acquire (lock);
 }
 
