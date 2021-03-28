@@ -149,8 +149,6 @@ exit (int status)
           }
         }
     }
-  // Debugging -LF
-  //printf("Thread will now exit\n");
   thread_exit ();
 }
 
@@ -163,12 +161,30 @@ halt (void)
 pid_t
 exec (const char *cmd_line)
 {
+  //pid_t pid = process_execute(cmdline);
+    /*struct child_process *child_process_ptr = find_child_process(pid);
+    if (!child_process_ptr)
+    {
+      return ERROR;
+    }
+    * check if process if loaded *
+    if (child_process_ptr->load_status == NOT_LOADED)
+    {
+      sema_down(&child_process_ptr->load_sema);
+    }
+    * check if process failed to load *
+    if (child_process_ptr->load_status == LOAD_FAIL)
+    {
+      remove_child_process(child_process_ptr);
+      return ERROR;
+    }
+    return pid; */
   /* a thread's id. When there is a user process within a kernel thread, we
    * use one-to-one mapping from tid to pid, which means pid = tid
-   */
+   *
   tid_t tid;
   struct thread *cur;
-  /* check if the user pinter is valid */
+  /* check if the user pinter is valid *
   if (!is_valid_ptr (cmd_line))
     {
       exit (-1);
@@ -184,7 +200,27 @@ exec (const char *cmd_line)
   if (cur->child_load_status == -1)
     tid = -1;
   lock_release(&cur->lock_child);
-  return tid;
+  return tid; */
+  lock_acquire (&fs_lock);
+	char * fn_cp = malloc (strlen(cmd_line)+1);
+	  strlcpy(fn_cp, cmd_line, strlen(cmd_line)+1);
+	  
+	  char * save_ptr;
+	  fn_cp = strtok_r(fn_cp," ",&save_ptr);
+
+	 struct file* f = filesys_open (fn_cp);
+
+	  if(f==NULL)
+	  {
+	  	lock_release (&fs_lock);
+	  	return -1;
+	  }
+	  else
+	  {
+	  	file_close(f);
+	  	lock_release (&fs_lock);
+	  	return process_execute(cmd_line);
+	  }
 }
 
 int 
@@ -454,3 +490,29 @@ close_file_by_owner (tid_t tid)
     }
 }
 
+/*
+struct child_process* find_child_process(int pid)
+{
+  struct thread *t = thread_current();
+  struct list_elem *e;
+  struct list_elem *next;
+  
+  for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = next)
+  {
+    next = list_next(e);
+    struct child_process *cp = list_entry(e, struct child_process, elem);
+    if (pid == cp->pid)
+    {
+      return cp;
+    }
+  }
+  return NULL;
+}
+
+* remove a specific child process *
+void
+remove_child_process (struct child_process *cp)
+{
+  list_remove(&cp->elem);
+  free(cp);
+} */
