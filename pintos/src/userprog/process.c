@@ -33,7 +33,7 @@ process_execute (const char *file_name)
 {
   // Debugging -SN
   //printf("Start in process_execute!\n");
-  char *fn_copy;
+  char *fn_copy, *fn_copy2;
   tid_t tid;
   struct child_status *child; 
   struct thread *cur;
@@ -44,6 +44,12 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  fn_copy2 = palloc_get_page (0);
+  if (fn_copy2 == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy2, file_name, PGSIZE);
+
 
   /* Only assign argv[0] to thread's name */
   char *cmd_name, *args;
@@ -56,7 +62,7 @@ process_execute (const char *file_name)
    * args points to " argone"
    */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, args);
-  thread_get_by_id(tid)->cmd_line = file_name;
+  thread_get_by_id(tid)->cmd_line = fn_copy2;
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   else 
