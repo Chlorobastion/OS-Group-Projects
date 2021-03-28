@@ -63,8 +63,11 @@ process_execute (const char *file_name)
    */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, args);
   thread_get_by_id(tid)->cmd_line = fn_copy2;
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) 
+  {
     palloc_free_page (fn_copy);
+    palloc_free_page (fn_copy2);
+  }
   else 
     { 
       cur = thread_current ();
