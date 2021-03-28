@@ -463,8 +463,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  //t->exit_error = -100;
-  //sema_init(&t->child_lock,0);
+
   #ifdef USERPROG
   t->child_load_status = 0;
   lock_init (&t->lock_child);

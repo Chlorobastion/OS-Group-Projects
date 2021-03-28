@@ -11,7 +11,6 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
-/* exit with status -1 for invalid addresses */
 static void exit (int);
 
 /* Registers handlers for interrupts that can be caused by user
@@ -164,9 +163,8 @@ page_fault (struct intr_frame *f)
   kill (f);
 }
 
-/* This function is exactly the same as the exit system call inside
- * syscall.c. Putting here for better logical structure.
- */
+/* Same as the exit system call inside syscall.c. 
+We were getting 'undefined reference error thats why we have a copy of exit here*/
 void
 exit (int status)
 {

@@ -6,7 +6,6 @@
 #include "userprog/process.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
-/* for shutdown_power_off */
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
 #include "threads/malloc.h"
@@ -21,14 +20,11 @@ struct file_descriptor
   struct list_elem elem;
 };
 
-/* a list of open files, represents all the files open by the user process
-   through syscalls. */
+/* List of open files */
 struct list open_files; 
 
-/* the lock used by syscalls involving file system to ensure only one thread
-   at a time is accessing file system */
+/* To ensure only one thread at a time is accessing the file system */
 struct lock fs_lock;
-
 static void syscall_handler (struct intr_frame *);
 
 /* System call functions */
@@ -53,16 +49,14 @@ bool is_valid_ptr (const void *);
 static int allocate_fd (void);
 void close_file_by_owner (tid_t);
 
-void
-syscall_init (void) 
+void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&open_files);
   lock_init (&fs_lock);
 }
 
-static void
-syscall_handler (struct intr_frame *f)
+static void syscall_handler (struct intr_frame *f)
 {
   uint32_t *esp;
   esp = f->esp;
@@ -99,8 +93,8 @@ syscall_handler (struct intr_frame *f)
           f->eax = open ((char *) *(esp + 1));
           break;
         case SYS_FILESIZE:
-	  f->eax = filesize (*(esp + 1));
-	  break;
+	        f->eax = filesize (*(esp + 1));
+	        break;
         case SYS_READ:
           f->eax = read (*(esp + 1), (void *) *(esp + 2), *(esp + 3));
           break;
@@ -122,14 +116,16 @@ syscall_handler (struct intr_frame *f)
     }
 }
 
-
-/* Terminates the current user program, returning status to the kernel.
- */
-void
-exit (int status)
+/* Terminates Pintos by calling shutdown_power_off(). */
+void halt (void)
 {
-  /* later on, we need to determine if there is process waiting for it */
-  /* process_exit (); */
+  shutdown_power_off ();
+}
+
+/* Terminates the current user program, returning status to the kernel. 
+A status of 0 indicates success and nonzero values indicate errors. */
+void exit (int status)
+{
   struct child_status *child;
   struct thread *cur = thread_current ();
   printf ("%s: exit(%d)\n", cur->name, status);
@@ -151,86 +147,40 @@ exit (int status)
     }
   thread_exit ();
 }
-
-void
-halt (void)
+/* Runs the executable whose name is given in cmd_line, passing any given arguments,
+ and returns the new process's program id (pid). */
+pid_t exec (const char *cmd_line)
 {
-  shutdown_power_off ();
-}
-
-pid_t
-exec (const char *cmd_line)
-{
-  //pid_t pid = process_execute(cmdline);
-    /*struct child_process *child_process_ptr = find_child_process(pid);
-    if (!child_process_ptr)
-    {
-      return ERROR;
-    }
-    * check if process if loaded *
-    if (child_process_ptr->load_status == NOT_LOADED)
-    {
-      sema_down(&child_process_ptr->load_sema);
-    }
-    * check if process failed to load *
-    if (child_process_ptr->load_status == LOAD_FAIL)
-    {
-      remove_child_process(child_process_ptr);
-      return ERROR;
-    }
-    return pid; */
-  /* a thread's id. When there is a user process within a kernel thread, we
-   * use one-to-one mapping from tid to pid, which means pid = tid
-   *
-  tid_t tid;
-  struct thread *cur;
-  /* check if the user pinter is valid *
-  if (!is_valid_ptr (cmd_line))
-    {
-      exit (-1);
-    }
-
-  cur = thread_current ();
-
-  cur->child_load_status = 0;
-  tid = process_execute (cmd_line);
-  lock_acquire(&cur->lock_child);
-  while (cur->child_load_status == 0)
-    cond_wait(&cur->cond_child, &cur->lock_child);
-  if (cur->child_load_status == -1)
-    tid = -1;
-  lock_release(&cur->lock_child);
-  return tid; */
   lock_acquire (&fs_lock);
 	char * fn_cp = malloc (strlen(cmd_line)+1);
-	  strlcpy(fn_cp, cmd_line, strlen(cmd_line)+1);
+	strlcpy(fn_cp, cmd_line, strlen(cmd_line)+1);
 	  
-	  char * save_ptr;
-	  fn_cp = strtok_r(fn_cp," ",&save_ptr);
+	char * save_ptr;
+	fn_cp = strtok_r(fn_cp," ",&save_ptr);
 
-	 struct file* f = filesys_open (fn_cp);
+	struct file* f = filesys_open (fn_cp);
 
-	  if(f==NULL)
-	  {
-	  	lock_release (&fs_lock);
-	  	return -1;
-	  }
-	  else
-	  {
-	  	file_close(f);
-	  	lock_release (&fs_lock);
-	  	return process_execute(cmd_line);
-	  }
+	if(f==NULL)
+	{
+	  lock_release (&fs_lock);
+	  return -1;
+	}
+	else
+	{
+	  file_close(f);
+	  lock_release (&fs_lock);
+	  return process_execute(cmd_line);
+	}
 }
-
-int 
-wait (pid_t pid)
+/* Waits for a child process pid and retrieves the child's exit status. */
+int  wait (pid_t pid)
 { 
   return process_wait(pid);
 }
 
-bool
-create (const char *file_name, unsigned size)
+/* Creates a new file called file initially initial_size bytes in size. 
+Returns true if successful, false otherwise. */
+bool create (const char *file_name, unsigned size)
 {
   bool status;
 
@@ -243,6 +193,7 @@ create (const char *file_name, unsigned size)
   return status;
 }
 
+/* Deletes the file called file. Returns true if successful, false otherwise. */
 bool 
 remove (const char *file_name)
 {
@@ -256,6 +207,8 @@ remove (const char *file_name)
   return status;
 }
 
+/* Opens the file called file. Returns a nonnegative integer handle called a "file descriptor" (fd), 
+or -1 if the file could not be opened. */
 int
 open (const char *file_name)
 {
@@ -270,20 +223,20 @@ open (const char *file_name)
  
   f = filesys_open (file_name);
   if (f != NULL)
-    {
-      fd = calloc (1, sizeof *fd);
-      fd->fd_num = allocate_fd ();
-      fd->owner = thread_current ()->tid;
-      fd->file_struct = f;
-      list_push_back (&open_files, &fd->elem);
-      status = fd->fd_num;
-    }
+  {
+    fd = calloc (1, sizeof *fd);
+    fd->fd_num = allocate_fd ();
+    fd->owner = thread_current ()->tid;
+    fd->file_struct = f;
+    list_push_back (&open_files, &fd->elem);
+    status = fd->fd_num;
+  }
   lock_release (&fs_lock);
   return status;
 }
 
-int
-filesize (int fd)
+/* Returns the size, in bytes, of the file open as fd. */
+int filesize (int fd)
 {
   struct file_descriptor *fd_struct;
   int status = -1;
@@ -295,6 +248,8 @@ filesize (int fd)
   return status;
 }
 
+/* Reads size bytes from the file open as fd into buffer. 
+Returns the number of bytes actually read (0 at end of file), or -1 if the file could not be read. */
 int
 read (int fd, void *buffer, unsigned size)
 {
@@ -313,20 +268,20 @@ read (int fd, void *buffer, unsigned size)
     }
 
   if (fd == STDIN_FILENO)
+  {
+    uint8_t c;
+    unsigned counter = size;
+    uint8_t *buf = buffer;
+    while (counter > 1 && (c = input_getc()) != 0)
     {
-      uint8_t c;
-      unsigned counter = size;
-      uint8_t *buf = buffer;
-      while (counter > 1 && (c = input_getc()) != 0)
-        {
-          *buf = c;
-          buffer++;
-          counter--; 
-        }
-      *buf = 0;
-      lock_release (&fs_lock);
-      return (size - counter);
-    } 
+      *buf = c;
+      buffer++;
+      counter--; 
+    }
+    *buf = 0;
+    lock_release (&fs_lock);
+    return (size - counter);
+  } 
   
   fd_struct = get_open_file (fd);
   if (fd_struct != NULL)
@@ -336,15 +291,15 @@ read (int fd, void *buffer, unsigned size)
   return status;
 }
 
-int
-write (int fd, const void *buffer, unsigned size)
+/* Writes size bytes from buffer to the open file fd. 
+Returns the number of bytes actually written, which may be less than size if some bytes could not be written. */
+int write (int fd, const void *buffer, unsigned size)
 {
   struct file_descriptor *fd_struct;  
   int status = 0;
 
   if (!is_valid_ptr (buffer) || !is_valid_ptr (buffer + size - 1))
     exit (-1);
-
   lock_acquire (&fs_lock); 
 
   if (fd == STDIN_FILENO)
@@ -352,14 +307,12 @@ write (int fd, const void *buffer, unsigned size)
       lock_release(&fs_lock);
       return -1;
     }
-
   if (fd == STDOUT_FILENO)
     {
       putbuf (buffer, size);
       lock_release(&fs_lock);
       return size;
     }
- 
   fd_struct = get_open_file (fd);
   if (fd_struct != NULL)
     status = file_write (fd_struct->file_struct, buffer, size);
@@ -367,9 +320,9 @@ write (int fd, const void *buffer, unsigned size)
   return status;
 }
 
-
-void 
-seek (int fd, unsigned position)
+/* Changes the next byte to be read or written in open file fd to position, 
+expressed in bytes from the beginning of the file. */
+void seek (int fd, unsigned position)
 {
   struct file_descriptor *fd_struct;
   lock_acquire (&fs_lock); 
@@ -377,11 +330,12 @@ seek (int fd, unsigned position)
   if (fd_struct != NULL)
     file_seek (fd_struct->file_struct, position);
   lock_release (&fs_lock);
-  return ;
+  return;
 }
 
-unsigned 
-tell (int fd)
+/* Returns the position of the next byte to be read or written in open file fd, 
+expressed in bytes from the beginning of the file. */
+unsigned tell (int fd)
 {
   struct file_descriptor *fd_struct;
   int status = 0;
@@ -393,8 +347,9 @@ tell (int fd)
   return status;
 }
 
-void 
-close (int fd)
+/* Closes file descriptor fd. Exiting or terminating a process implicitly closes all its open file descriptors, 
+as if by calling this function for each one. */
+void close (int fd)
 {
   struct file_descriptor *fd_struct;
   lock_acquire (&fs_lock); 
@@ -405,54 +360,47 @@ close (int fd)
   return ; 
 }
 
-struct file_descriptor *
-get_open_file (int fd)
+/* Helper method to get open file */
+struct file_descriptor * get_open_file (int fd)
 {
   struct list_elem *e;
   struct file_descriptor *fd_struct; 
   e = list_tail (&open_files);
   while ((e = list_prev (e)) != list_head (&open_files)) 
-    {
-      fd_struct = list_entry (e, struct file_descriptor, elem);
-      if (fd_struct->fd_num == fd)
-	return fd_struct;
-    }
+  {
+    fd_struct = list_entry (e, struct file_descriptor, elem);
+    if (fd_struct->fd_num == fd)
+	  return fd_struct;
+  }
   return NULL;
 }
 
-void
-close_open_file (int fd)
+/* Helper method to close the file */
+void close_open_file (int fd)
 {
   struct list_elem *e;
   struct list_elem *prev;
   struct file_descriptor *fd_struct; 
   e = list_end (&open_files);
   while (e != list_head (&open_files)) 
-    {
-      prev = list_prev (e);
-      fd_struct = list_entry (e, struct file_descriptor, elem);
-      if (fd_struct->fd_num == fd)
-	{
-	  list_remove (e);
-          file_close (fd_struct->file_struct);
-	  free (fd_struct);
-	  return ;
-	}
-      e = prev;
-    }
+  {
+    prev = list_prev (e);
+    fd_struct = list_entry (e, struct file_descriptor, elem);
+    if (fd_struct->fd_num == fd)
+	  {
+	    list_remove (e);
+      file_close (fd_struct->file_struct);
+	    free (fd_struct);
+	    return ;
+	  }
+    e = prev;
+  }
   return ;
 }
 
 
-/* The kernel must be very careful about doing so, because the user can
- * pass a null pointer, a pointer to unmapped virtual memory, or a pointer
- * to kernel virtual address space (above PHYS_BASE). All of these types of
- * invalid pointers must be rejected without harm to the kernel or other
- * running processes, by terminating the offending process and freeing
- * its resources.
- */
-bool
-is_valid_ptr (const void *usr_ptr)
+/* Checks if is valid pointer */
+bool is_valid_ptr (const void *usr_ptr)
 {
   struct thread *cur = thread_current ();
   if (usr_ptr != NULL && is_user_vaddr (usr_ptr))
@@ -462,13 +410,13 @@ is_valid_ptr (const void *usr_ptr)
   return false;
 }
 
-int
-allocate_fd ()
+int allocate_fd ()
 {
   static int fd_current = 1;
   return ++fd_current;
 }
 
+/* Helper method to close the file */
 void
 close_file_by_owner (tid_t tid)
 {
@@ -477,42 +425,15 @@ close_file_by_owner (tid_t tid)
   struct file_descriptor *fd_struct; 
   e = list_begin (&open_files);
   while (e != list_tail (&open_files)) 
-    {
-      next = list_next (e);
-      fd_struct = list_entry (e, struct file_descriptor, elem);
-      if (fd_struct->owner == tid)
-	{
-	  list_remove (e);
-	  file_close (fd_struct->file_struct);
-          free (fd_struct);
-	}
-      e = next;
-    }
-}
-
-/*
-struct child_process* find_child_process(int pid)
-{
-  struct thread *t = thread_current();
-  struct list_elem *e;
-  struct list_elem *next;
-  
-  for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = next)
   {
-    next = list_next(e);
-    struct child_process *cp = list_entry(e, struct child_process, elem);
-    if (pid == cp->pid)
-    {
-      return cp;
-    }
+    next = list_next (e);
+    fd_struct = list_entry (e, struct file_descriptor, elem);
+    if (fd_struct->owner == tid)
+	  {
+	    list_remove (e);
+	    file_close (fd_struct->file_struct);
+      free (fd_struct);
+	  }
+    e = next;
   }
-  return NULL;
 }
-
-* remove a specific child process *
-void
-remove_child_process (struct child_process *cp)
-{
-  list_remove(&cp->elem);
-  free(cp);
-} */

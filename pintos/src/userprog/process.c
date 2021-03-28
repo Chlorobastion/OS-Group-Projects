@@ -31,15 +31,11 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  // Debugging -SN
-  //printf("Start in process_execute!\n");
   char *fn_copy, *fn_copy2;
   tid_t tid;
   struct child_status *child; 
   struct thread *cur;
    
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
@@ -50,17 +46,9 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy2, file_name, PGSIZE);
 
-
-  /* Only assign argv[0] to thread's name */
   char *cmd_name, *args;
   cmd_name = strtok_r (fn_copy, " ", &args);
 
-  /* Create a new thread to execute FILE_NAME. */
-  /* tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy); */
-  /* i.e.: if "args-single  argone"
-   * cmd_name = "args-single\0"
-   * args points to " argone"
-   */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, args);
   thread_get_by_id(tid)->cmd_line = fn_copy2;
   if (tid == TID_ERROR) 
@@ -80,14 +68,10 @@ process_execute (const char *file_name)
         list_push_back(&cur->children, &child->elem_child_status);
       }
     }
-  // Debugging -SN
-  //printf("End in process_execute!\n");
   return tid;
 }
 
 
-/* A thread function that loads a user process and starts it
-   running. */
 static void
 start_process (void *file_name_)
 {
@@ -103,12 +87,7 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  /* success = load (file_name, &if_.eip, &if_.esp); */
-
   success = load (file_name, &if_.eip, &if_.esp);
-  /* If load failed, quit. */
-  /* if (!success) */
-  /*   thread_exit (); */
   if (!success)
     load_status = -1;
   else
@@ -148,12 +127,8 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-/* Original implementation */
-/* process_wait (tid_t child_tid UNUSED) */
 process_wait (tid_t child_tid)
 {
-  // Debugging -SN
-  //printf("Start in process_wait!\n");
   int status;
   struct thread *cur;
   struct child_status *child = NULL;
@@ -173,17 +148,11 @@ process_wait (tid_t child_tid)
        status = -1;
      else
        {
-         // Debugging -SN
-         //printf("About to acquire lock in process.wait!\n");
          lock_acquire(&cur->lock_child);
          while (thread_get_by_id (child_tid) != NULL)
          {
-           // Debugging -SN
-           //printf("Child still around...\n");
            cond_wait (&cur->cond_child, &cur->lock_child);
          }
-         // Debugging -SN
-         //printf("Break out of loop!\n");
          if (!child->is_exit_called || child->has_been_waited)
            status = -1;
          else
@@ -196,8 +165,6 @@ process_wait (tid_t child_tid)
    }
   else 
     status = TID_ERROR;
-  // Debugging -SN
-  //printf("End in process_wait!\n");
   return status;
 }
 
@@ -228,7 +195,6 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
-  /*free children list*/
   e = list_begin (&cur->children);
   while (e != list_tail(&cur->children))
     {
@@ -239,11 +205,9 @@ process_exit (void)
       e = next;
     }
   
-  /*re-enable the file's writable property*/
   if (cur->exec_file != NULL)
     file_allow_write (cur->exec_file);
   
-  /*free files whose owner is the current thread*/
   close_file_by_owner (cur->tid);  
 
   parent = thread_get_by_id (cur->parent_id);
@@ -466,7 +430,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   return success;
 }
 
-/* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
 
@@ -647,112 +610,6 @@ setup_stack (void **esp, const char *file_name)
   free(argv);
 
   return success;
-  
-  // uint8_t *kpage;
-  // bool success = false;
-
-  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  // if (kpage != NULL)
-  //   {
-  //     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-  //     if (success) {
-  // 	    *esp = PHYS_BASE;
-
-  //       const int DEFAULT_ARGV = 2;
-  //       char* token;
-  //       char** argv = malloc(DEFAULT_ARGV*sizeof(char*));
-  //       char** cont = malloc(DEFAULT_ARGV*sizeof(char*));
-
-  //       uint8_t *argstr_head;
-  //       char *cmd_name = thread_current ()->name;
-  //       char *full_name = thread_current ()->cmd_line;
-  //       int strlength, total_length;
-  //       int argc;
-
-  //       /*push the arguments string into stack*/ // STEP 1/2: PARSE ARGS AND PUSH ONTO STACK, REVERSE
-  //       strlength = strlen(full_name);
-  //       *esp -= strlength;
-  //       memcpy(*esp, file_name, strlength);
-  //       total_length += strlength;
-
-  //       /*push command name into stack*/
-  //       strlength = strlen(cmd_name) + 1;
-  //       *esp -= strlength;
-  //       argstr_head = *esp;
-  //       memcpy(*esp, cmd_name, strlength);
-  //       total_length += strlength;
-
-  //       /*set alignment, get the starting address, modify *esp */ // STEP 3: WORD ALIGN
-  //       *esp -= 4 - total_length % 4;
-
-  //       /* push argv[argc] null into the stack */
-  //       *esp -= 4;
-  //       * (uint32_t *) *esp = (uint32_t) NULL;
-
-  //       /* scan throught the file name with arguments string downward,
-  //        * using the cur_addr and total_length above to define boundary.
-  //        * omitting the beginning space or '\0', but for every encounter
-  //        * after, push the last non-space-and-'\0' address, which is current
-  //        * address minus 1, as one of argv to the stack, and set the space to
-  //        * '\0', multiple adjancent spaces and '0' is treated as one.
-  //        */
-  //       int i = total_length - 1;
-  //       /*omitting the starting space and '\0' */
-  //       while (*(argstr_head + i) == ' ' ||  *(argstr_head + i) == '\0')
-  //         {
-  //           if (*(argstr_head + i) == ' ')
-  //             {
-  //               *(argstr_head + i) = '\0';
-  //             }
-  //           i--;
-  //         }
-
-  //       /*scan through args string, push args address into stack*/
-  //       char *mark;
-  //       for (mark = (char *)(argstr_head + i); i > 0;
-  //            i--, mark = (char*)(argstr_head+i))
-  //         {
-  //           /*detect args, if found, push it's address to stack*/
-  //           if ( (*mark == '\0' || *mark == ' ') &&
-  //                (*(mark+1) != '\0' && *(mark+1) != ' '))
-  //             {
-  //               *esp -= 4;
-  //               total_length += 4;
-  //               * (uint32_t *) *esp = (uint32_t) mark + 1;
-  //               argc++;
-  //             }
-  //           /*set space to '\0', so that each arg string will terminate*/
-  //           if (*mark == ' ')
-  //             *mark = '\0';
-  //         }
-
-  //       /*push one more arg, which is the command name, into stack*/
-  //       *esp -= 4;
-  //       total_length += 4;
-  //       * (uint32_t *) *esp = (uint32_t) argstr_head;
-  //       argc++;
-
-  //       /*push argv*/
-  //       * (uint32_t *) (*esp - 4) = *(uint32_t *) esp;
-  //       *esp -= 4;
-  //       total_length += 4;
-
-  //       /*push argc*/
-  //       *esp -= 4;
-  //       total_length += 4;
-  //       * (int *) *esp = argc;
-
-  //       /*push return address*/
-  //       *esp -= 4;
-  //       total_length += 8;
-  //       * (uint32_t *) *esp = 0x0;
-
-  //       total_length += 4 - total_length % 4;
-  //       //hex_dump((uintptr_t) *esp, *esp, total_length, true);
-  //     } else
-  //       palloc_free_page (kpage);
-  //   }
-  // return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
