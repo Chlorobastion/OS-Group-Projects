@@ -113,8 +113,10 @@ pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool writable)
     {
       ASSERT ((*pte & PTE_P) == 0);
       *pte = pte_create_user (kpage, writable);
-            /* set pte to the corresponding entry in frame table */
+
+      /* set pte to the corresponding entry in frame table */
       vm_frame_set_usr (kpage, pte, upage);
+
       return true;
     }
   else
@@ -246,7 +248,7 @@ active_pd (void)
   return ptov (pd);
 }
 
-/* Seom page table changes can cause the CPU's translation
+/* Some page table changes can cause the CPU's translation
    lookaside buffer (TLB) to become out-of-sync with the page
    table.  When this happens, we have to "invalidate" the TLB by
    re-activating it.
