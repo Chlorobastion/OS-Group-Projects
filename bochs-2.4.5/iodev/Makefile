@@ -19,7 +19,7 @@
 
 .SUFFIXES: .cc
 
-prefix          = /home/n/neal01/cis520/usr/local
+prefix          = /homes/neal01/cis520/usr/local
 exec_prefix     = ${prefix}
 srcdir          = .
 
