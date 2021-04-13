@@ -1,0 +1,26 @@
+--- iodev/pit82c54.cc	2009-06-30 03:09:38.000000000 -0500
++++ iodev/pit82c54.cc	2010-08-24 13:45:28.595669999 -0500
+@@ -49,6 +49,7 @@
+ 
+ #include "iodev.h"
+ #include "pit82c54.h"
++#include <stdlib.h>
+ #define LOG_THIS this->
+ 
+ 
+@@ -413,7 +414,14 @@
+       case 2:
+         if (thisctr.count_written) {
+           if (thisctr.triggerGATE || thisctr.first_pass) {
+-            set_count(thisctr, thisctr.inlatch);
++//            set_count(thisctr, thisctr.inlatch);
++            unsigned n = thisctr.inlatch;
++            if (jitter && n > 5) {
++                n *= (double) rand() / RAND_MAX;
++                if (n < 5)
++                    n = 5;
++            }
++            set_count(thisctr, n);
+             thisctr.next_change_time=(thisctr.count_binary-1) & 0xFFFF;
+             thisctr.null_count=0;
+             if (thisctr.inlatch==1) {

@@ -1,0 +1,151 @@
+		           +---------------------------+
+       	                   |         CIS 520           |
+		           | PROJECT 3: Virtual Memory |
+		           |     DESIGN DOCUMENT       |
+		           +---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names of your group members.
+
+Luke Falk
+Akshay Mhatre
+Sebastian Neal
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+https://github.com/codyjack/OS-pintos
+
+			PAGE TABLE MANAGEMENT
+			=====================
+
+---- ALGORITHMS ----
+
+>> A1: In a few paragraphs, describe the existing code for locating the
+>> frame, if any, that contains the data of a given page.
+
+We have a hash table that stores our list of frames, and when we need to
+search for the frame that has data for a given page, we iterate over the
+list of our frames in order to find the frame that has the necessary page
+data.
+
+---- SYNCHRONIZATION ----
+
+>> A2: When two user processes both need a new frame at the same time,
+>> how are races avoided?
+
+We use the pintos included palloc (which in turn makes use of a lock)
+to avoid race conditions when a user process would like a new frame.
+
+		       PAGING TO AND FROM DISK
+		       =======================
+
+---- ALGORITHMS ----
+
+>> B1: When a frame is required but none is free, some frame must be
+>> evicted.  Describe the algorithm used to choose a frame to evict.
+
+We iterate over our entries in the frame table, trying to find a frame
+that is clean (has not been written to nor read from), and if it finds
+one, that is the frame that is used. Elsewise, if all of the frames are
+found to be dirty, we make do with the first frame in the list.
+
+>> B2: Explain your heuristic for deciding whether a page fault for an
+>> invalid virtual address should cause the stack to be extended into
+>> the page that faulted.
+
+If we cannot find a supplemental page table, and our fault adress is
+somewhere above the stack pointer - 32, then we know the fault happened
+in the stack and we grow the stack into the page.
+
+			 MEMORY MAPPED FILES
+			 ===================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+In process.c
+struct mmfile
+{
+   mapid_t mapidl
+   struct file* file;
+   void * start_addrl
+   unsigned pg_cnt;
+   struct hash_elem elem;
+}
+
+This struct is used to keep track of the memory id file in the memory
+hash table.
+
+In thread.h
+mapid_t mapid_allocator;
+struct hash mmfiles;
+
+This struct keeps track of the memory mapped files table for this thread.
+
+---- ALGORITHMS ----
+
+>> C2: Describe how memory mapped files integrate into your virtual
+>> memory subsystem.  Explain how the page fault and eviction
+>> processes differ between swap pages and other pages.
+
+When we start a process, we initialize the hash table for memory mapped
+files associated with this process. As we need to, we adjust the hash table
+with all of our memory mapped files, until we reach the end of the process
+and the memory allocated for this table is released.
+
+>> C3: Explain how you determine whether a new file mapping overlaps
+>> any existing segment.
+
+When we go to map a new piece into the table, we first calculate how
+many pages are needed to store it. Then we reference the Pintos hash
+table and the supplemental hash table to ensure that the page is not
+already there. If it is, we do not let the file be mapped.
+
+---- RATIONALE ----
+
+>> C4: Mappings created with "mmap" have similar semantics to those of
+>> data demand-paged from executables, except that "mmap" mappings are
+>> written back to their original files, not to swap.  This implies
+>> that much of their implementation can be shared.  Explain why your
+>> implementation either does or does not share much of the code for
+>> the two situations.
+
+Our implementation does share much of the code for the two situations
+because they are so similar. If the code was not shared, there would
+be a lot of rewriting the same things, and we do not need that kind of
+redundancy.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
