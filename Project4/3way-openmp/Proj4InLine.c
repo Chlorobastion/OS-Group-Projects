@@ -36,9 +36,10 @@ void count_array()
         j = 0;
         char *this_line = buffers[i];
         thisChar = this_line[j];
-        // Iterate over the entire line
-        while(thisChar != '\0')
+        // Iterate over the entire line, ending at the null terminal or a new line character
+        while(thisChar != '\0' && thisChar != '\n')
         {
+            //printf("%c", thisChar);
             buffer_mean_values[i] += (int) thisChar;
             j++; // Move to the next character in the line
             thisChar = this_line[j]; // get the character at this i and j (line and symbol)
@@ -79,6 +80,8 @@ void read_file()
         for(i = 0; i < number_of_cores; i++)
         {
             mean_values[line_offset + i] = buffer_mean_values[i];
+            buffer_mean_values[i] = 0; // Need to reset the buffer when we are done with it
+            buffers[i] = NULL;
         }
         line_offset += number_of_cores; // make sure to shift the location we are writing to in the mean_values array
     }
@@ -103,7 +106,7 @@ void print_results()
         double thisMean = mean_values[i];
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
-            printf("%d: %f\n", i, mean_values[i]); // print the information to the console
+            printf("%d: %.1f\n", i, mean_values[i]); // print the information to the console
         }
     }
 }
