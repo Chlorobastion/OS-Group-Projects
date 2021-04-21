@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FILE_NAME "Test.txt"
+//#define FILE_NAME "Test.txt"
+#define FILE_NAME "/homes/dan/625/wiki_dump.txt"
 #define FILE_SIZE 2000000
 
 double mean_values[FILE_SIZE]; // the size of this array should be the total lines in the file
@@ -80,7 +81,8 @@ void read_file()
         for(i = 0; i < number_of_cores; i++)
         {
             mean_values[line_offset + i] = buffer_mean_values[i];
-            buffer_mean_values[i] = 0; // Need to reset the buffer when we are done with it
+             /* Need to reset the buffers when we are done with them on this pass */
+            buffer_mean_values[i] = 0;
             buffers[i] = NULL;
         }
         line_offset += number_of_cores; // make sure to shift the location we are writing to in the mean_values array
