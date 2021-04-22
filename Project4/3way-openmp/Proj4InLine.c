@@ -1,6 +1,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 //#define FILE_NAME "Test.txt"
 #define FILE_NAME "/homes/dan/625/wiki_dump.txt"
@@ -30,11 +31,23 @@ void read_file()
     }
 
     int end_of_file = 1; // This will act similar to a boolean
+    int nthreads, tid;
     while(end_of_file > 0)
     {
         // Split up the threads to go in parallel here
-        #pragma omp parallel num_threads(number_of_cores)
+        #pragma omp parallel num_threads(number_of_cores) private(tid)
         {
+            tid = omp_get_thread_num();
+
+            /* Only master thread will do this (Debugging) */
+            /*
+            if(tid == 0)
+            {
+                nthreads = omp_get_num_threads();
+                printf("Number of threads = %d\n", nthreads);
+            }
+            */
+
             int myLine;
             char *line_buffer = NULL;
             size_t line_buf_size = 0;
@@ -67,11 +80,7 @@ void read_file()
                     thisMean = thisMean / i;
                 }
 
-                // Critical section here
-                #pragma omp critical
-                {
-                    mean_values[myLine] = thisMean;
-                }
+                mean_values[myLine] = thisMean;
             }
             else
             {
@@ -94,7 +103,7 @@ void print_results()
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
             printf("%d: %.1f\n", i, mean_values[i]); // print the information to the console
-            //printf("Number of cores: %d\n", number_of_cores); // Debugging
+            
         }
     }
 }
@@ -106,6 +115,13 @@ main(int argc, char *argv[])
         number_of_cores = atoi(argv[1]); // change the number of cores to the number of cores allocated
     }
     init_arrays();
+    time_t start; // time before parallel
+    time_t end; // time after parallel
+    time(&start);
     read_file();
+    time(&end);
     print_results();
+    double elapsed = difftime(end, start); // time taken to calculate mean
+    printf("Cores used: %d\n", number_of_cores); // debugging info.
+    printf("Time elapsed: %0.1f seconds\n", elapsed); // debugging info.
 }

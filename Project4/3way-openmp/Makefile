@@ -1,5 +1,5 @@
 # This is the program used to compile 
-CC			= gcc
+CC			= gcc -fopenmp
 
 # This is the name of the executable
 PROGRAM		= OutputOpenMP
@@ -20,7 +20,7 @@ $(PROGRAM): $(OBJS)
 	$(CC) $(OBJS) -o $(PROGRAM) $(LDFLAGS)
 
 check:
-	./$(PROGRAM) 32
+	./$(PROGRAM) 1
 
 clean:
 	/bin/rm -f $(OBJS) $(PROGRAM)
