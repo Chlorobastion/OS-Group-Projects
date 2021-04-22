@@ -13,7 +13,7 @@ int number_of_cores = 1; // number of cores being used in our multiprocessing
 void init_arrays()
 {
     int i;
-    //number_of_cores = ; //change the number of cores to the number of cores allocated
+    //number_of_cores = ; // change the number of cores to the number of cores allocated
 
     for(i = 0; i < FILE_SIZE; i++) // i should represent the number of lines in the file
     {
@@ -33,47 +33,52 @@ void read_file()
     int end_of_file = 1; // This will act similar to a boolean
     while(end_of_file > 0)
     {
-        // Split up the threads to go in parallel here ADD CODE TO ME
-        int myLine;
-        char *line_buffer = NULL;
-        size_t line_buf_size = 0;
-        ssize_t line_size = 0;
-
-        // Critical section here ADD CODE TO ME
-        line_size = getline(&line_buffer, &line_buf_size, fp); // Grab a line in the file
-        if(line_size >= 0) // We are not at end of the file
+        // Split up the threads to go in parallel here
+        #pragma omp parallel num_threads(number_of_cores)
         {
-            myLine = line_num; // Keep track of what line this thread is reading
-            line_num++; // Make sure the next thread knows it has the next line
-            // End Critical section ADD CODE TO ME
+            int myLine;
+            char *line_buffer = NULL;
+            size_t line_buf_size = 0;
+            ssize_t line_size = 0;
 
-            int i = 0;
-            char thisChar;
-            double thisMean = 0;
-            thisChar = line_buffer[i];
-            // Iterate over the entire line, ending at the null terminal or a new line character
-            while(thisChar != '\0' && thisChar != '\n')
+            // Critical section here
+            #pragma omp critical
             {
-                thisMean += (int) thisChar;
-                i++; // Move to the next character in the line
-                thisChar = line_buffer[i]; // get the character at this i and j (line and symbol)
-            }
-            // Check if the line had content to calculate
-            if(i > 0)
-            {
-                thisMean = thisMean / i;
+                line_size = getline(&line_buffer, &line_buf_size, fp); // Grab a line in the file
+                myLine = line_num; // Keep track of what line this thread is reading
+                line_num++; // Make sure the next thread knows it has the next line
             }
 
-            // Critical section here ADD CODE TO ME
-            mean_values[myLine] = thisMean;
-            // End Critical section ADD CODE TO ME
-        }
-        else
-        {
-            // End Critical section ADD CODE TO ME
-            end_of_file = 0; // We are at the end of the file, so we should break out of the loop after all current threads die
-        }
+            if(line_size >= 0) // We are not at end of the file
+            {
+                int i = 0;
+                char thisChar;
+                double thisMean = 0;
+                thisChar = line_buffer[i];
+                // Iterate over the entire line, ending at the null terminal or a new line character
+                while(thisChar != '\0' && thisChar != '\n')
+                {
+                    thisMean += (int) thisChar;
+                    i++; // Move to the next character in the line
+                    thisChar = line_buffer[i]; // get the character at this i and j (line and symbol)
+                }
+                // Check if the line had content to calculate
+                if(i > 0)
+                {
+                    thisMean = thisMean / i;
+                }
 
+                // Critical section here
+                #pragma omp critical
+                {
+                    mean_values[myLine] = thisMean;
+                }
+            }
+            else
+            {
+                end_of_file = 0; // We are at the end of the file, so we should break out of the loop after all current threads die
+            }
+        }
         // Rejoin the parallel threads and reloop unless we are done with the file
     }
 
