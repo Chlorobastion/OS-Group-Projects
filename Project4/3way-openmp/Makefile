@@ -2,7 +2,7 @@
 CC			= gcc
 
 # This is the name of the executable
-PROGRAM		= mpi
+PROGRAM		= OutputOpenMP
 
 # This is the name of the c file
 SRCS		= Proj4InLine.c

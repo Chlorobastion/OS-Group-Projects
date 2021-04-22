@@ -4,11 +4,10 @@
 
 //#define FILE_NAME "Test.txt"
 #define FILE_NAME "/homes/dan/625/wiki_dump.txt"
-#define FILE_SIZE 2000000
+#define FILE_SIZE 1000000
 
 double mean_values[FILE_SIZE]; // the size of this array should be the total lines in the file
-char *buffers[32]; // at maximum, we have access to 32 cores for multiprocessing; change this number if that changes
-double buffer_mean_values[32];
+int line_num = 0; // global variable to keep track of the current line being dealt with
 int number_of_cores = 1; // number of cores being used in our multiprocessing
 
 void init_arrays()
@@ -20,44 +19,10 @@ void init_arrays()
     {
         mean_values[i] = 0;
     }
-    
-    for(i = 0; i < number_of_cores; i++) // our array size will change based on how many cores we are using
-    {
-        buffers[i] = NULL;
-    }
-}
-
-void count_array()
-{
-    char thisChar;
-
-    int i, j;
-    for(i = 0; i < number_of_cores; i++) // i should represent the total number of lines read right now
-    {
-        j = 0;
-        char *this_line = buffers[i];
-        thisChar = this_line[j];
-        // Iterate over the entire line, ending at the null terminal or a new line character
-        while(thisChar != '\0' && thisChar != '\n')
-        {
-            //printf("%c", thisChar);
-            buffer_mean_values[i] += (int) thisChar;
-            j++; // Move to the next character in the line
-            thisChar = this_line[j]; // get the character at this i and j (line and symbol)
-        }
-        // Check if the line had content to calculate
-        if(j > 0)
-        {
-            buffer_mean_values[i] = buffer_mean_values[i] / j;
-        }
-    }
 }
 
 void read_file()
 {
-    int i, line_offset = 0;
-    size_t line_buf_size = 0;
-    ssize_t line_size = 0;
     FILE *fp = fopen(FILE_NAME, "r");
     if(!fp)
     {
@@ -65,34 +30,51 @@ void read_file()
         return;
     }
 
-    /* Read the lines in batches */
-    while (line_size >= 0)
+    int end_of_file = 1; // This will act similar to a boolean
+    while(end_of_file > 0)
     {
-        for(i = 0; i < number_of_cores; i++)
-        {
-            /* Grab a line in the file */
-            line_size = getline(&buffers[i], &line_buf_size, fp);
-            if(line_size < 0)
-            {
-                continue;
-            }
-        }
-        count_array();
-        for(i = 0; i < number_of_cores; i++)
-        {
-            mean_values[line_offset + i] = buffer_mean_values[i];
-             /* Need to reset the buffers when we are done with them on this pass */
-            buffer_mean_values[i] = 0;
-            buffers[i] = NULL;
-        }
-        line_offset += number_of_cores; // make sure to shift the location we are writing to in the mean_values array
-    }
+        // Split up the threads to go in parallel here ADD CODE TO ME
+        int myLine;
+        char *line_buffer = NULL;
+        size_t line_buf_size = 0;
+        ssize_t line_size = 0;
 
-    /* Free the allocated the line buffers */
-    for(i = 0; i < number_of_cores; i++)
-    {
-        free(buffers[i]);
-        buffers[i] = NULL;
+        // Critical section here ADD CODE TO ME
+        line_size = getline(&line_buffer, &line_buf_size, fp); // Grab a line in the file
+        if(line_size >= 0) // We are not at end of the file
+        {
+            myLine = line_num; // Keep track of what line this thread is reading
+            line_num++; // Make sure the next thread knows it has the next line
+            // End Critical section ADD CODE TO ME
+
+            int i = 0;
+            char thisChar;
+            double thisMean = 0;
+            thisChar = line_buffer[i];
+            // Iterate over the entire line, ending at the null terminal or a new line character
+            while(thisChar != '\0' && thisChar != '\n')
+            {
+                thisMean += (int) thisChar;
+                i++; // Move to the next character in the line
+                thisChar = line_buffer[i]; // get the character at this i and j (line and symbol)
+            }
+            // Check if the line had content to calculate
+            if(i > 0)
+            {
+                thisMean = thisMean / i;
+            }
+
+            // Critical section here ADD CODE TO ME
+            mean_values[myLine] = thisMean;
+            // End Critical section ADD CODE TO ME
+        }
+        else
+        {
+            // End Critical section ADD CODE TO ME
+            end_of_file = 0; // We are at the end of the file, so we should break out of the loop after all current threads die
+        }
+
+        // Rejoin the parallel threads and reloop unless we are done with the file
     }
 
     /* Close the file when we are done */
@@ -105,7 +87,6 @@ void print_results()
 
     for(i = 0; i < FILE_SIZE; i++) // should be the number of lines in the file
     {
-        double thisMean = mean_values[i];
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
             printf("%d: %.1f\n", i, mean_values[i]); // print the information to the console
