@@ -13,7 +13,6 @@ int number_of_cores = 1; // number of cores being used in our multiprocessing
 void init_arrays()
 {
     int i;
-    //number_of_cores = ; // change the number of cores to the number of cores allocated
 
     for(i = 0; i < FILE_SIZE; i++) // i should represent the number of lines in the file
     {
@@ -95,12 +94,17 @@ void print_results()
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
             printf("%d: %.1f\n", i, mean_values[i]); // print the information to the console
+            //printf("Number of cores: %d\n", number_of_cores); // Debugging
         }
     }
 }
 
-main()
+main(int argc, char *argv[])
 {
+    if(argc = 2) // If we pass in more than just the name of the program, we must be changing the number of cores used
+    {
+        number_of_cores = atoi(argv[1]); // change the number of cores to the number of cores allocated
+    }
     init_arrays();
     read_file();
     print_results();

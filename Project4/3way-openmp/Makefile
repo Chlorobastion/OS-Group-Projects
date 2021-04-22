@@ -20,7 +20,7 @@ $(PROGRAM): $(OBJS)
 	$(CC) $(OBJS) -o $(PROGRAM) $(LDFLAGS)
 
 check:
-	./$(PROGRAM)
+	./$(PROGRAM) 32
 
 clean:
 	/bin/rm -f $(OBJS) $(PROGRAM)
