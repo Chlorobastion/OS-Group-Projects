@@ -10,6 +10,7 @@
 double mean_values[FILE_SIZE]; // the size of this array should be the total lines in the file
 int line_num = 0; // global variable to keep track of the current line being dealt with
 int number_of_cores = 1; // number of cores being used in our multiprocessing
+int lines_per_thread = 25;
 
 void init_arrays()
 {
@@ -48,43 +49,61 @@ void read_file()
             }
             */
 
-            int myLine;
-            char *line_buffer = NULL;
+            int myFirstLine, i;
+            char *line_buffer[lines_per_thread];
             size_t line_buf_size = 0;
-            ssize_t line_size = 0;
+            ssize_t line_size[lines_per_thread];
+
+            for(i = 0; i < lines_per_thread; i++)
+            {
+                line_buffer[i] = NULL;
+                line_size[i] = 0;
+            }
 
             // Critical section here
             #pragma omp critical
             {
-                line_size = getline(&line_buffer, &line_buf_size, fp); // Grab a line in the file
-                myLine = line_num; // Keep track of what line this thread is reading
-                line_num++; // Make sure the next thread knows it has the next line
+                for(i = 0; i < lines_per_thread; i++) // going to grab a bunch of lines at once
+                {
+                    line_size[i] = getline(&line_buffer[i], &line_buf_size, fp); // Grab a line in the file
+                    if(line_size[i] < 0)
+                    {
+                        continue;
+                    }
+                }
+                myFirstLine = line_num; // Keep track of what line this thread is reading
+                line_num += lines_per_thread; // Make sure the next thread knows it has the next line
             }
 
-            if(line_size >= 0) // We are not at end of the file
+            for(i = 0; i < lines_per_thread; i++)
             {
-                int i = 0;
-                char thisChar;
-                double thisMean = 0;
-                thisChar = line_buffer[i];
-                // Iterate over the entire line, ending at the null terminal or a new line character
-                while(thisChar != '\0' && thisChar != '\n')
+                if(line_size[i] >= 0) // We are not at end of the file
                 {
-                    thisMean += (int) thisChar;
-                    i++; // Move to the next character in the line
-                    thisChar = line_buffer[i]; // get the character at this i and j (line and symbol)
-                }
-                // Check if the line had content to calculate
-                if(i > 0)
-                {
-                    thisMean = thisMean / i;
-                }
+                    int j = 0;
+                    char thisChar;
+                    double thisMean = 0;
+                    char *thisLine = line_buffer[i];
+                    thisChar = thisLine[j];
+                    // Iterate over the entire line, ending at the null terminal or a new line character
+                    while(thisChar != '\0' && thisChar != '\n')
+                    {
+                        thisMean += (int) thisChar;
+                        j++; // Move to the next character in the line
+                        thisChar = thisLine[j]; // get the character at this i and j (line and symbol)
+                    }
+                    // Check if the line had content to calculate
+                    if(j > 0)
+                    {
+                        thisMean = thisMean / j;
+                    }
 
-                mean_values[myLine] = thisMean;
-            }
-            else
-            {
-                end_of_file = 0; // We are at the end of the file, so we should break out of the loop after all current threads die
+                    mean_values[myFirstLine + i] = thisMean;
+                }
+                else
+                {
+                    end_of_file = 0; // We are at the end of the file, so we should break out of the loop after all current threads die
+                    break;
+                }
             }
         }
         // Rejoin the parallel threads and reloop unless we are done with the file
