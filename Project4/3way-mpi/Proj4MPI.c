@@ -11,6 +11,7 @@ float mean_values[FILE_SIZE]; // the size of this array should be the total line
 float local_mean_values[FILE_SIZE];
 int number_of_cores = 1; // number of cores being used in our multiprocessing
 int end_of_file = 1; // This will act similar to a boolean
+int lines_to_read = FILE_SIZE;
 char *local_line_buffer;
 size_t local_line_buf_size = 0;
 ssize_t local_line_size;
@@ -44,16 +45,12 @@ void *mean_lines(int rank, int iterations)
             thisChar = thisLine[j]; // get the character at this i and j (line and symbol)
         }
         // Check if the line had content to calculate
-        //printf("Value before division = %d!\n", thisMean); // Debugging
-        //printf("Line %i has length %d\n", myLine, j); // Debugging
         if(j > 0)
         {
             thisMean = thisMean / j;
         }
 
         local_mean_values[myLine] = thisMean;
-        //printf("I calculated line %d!\n", myLine); // Debugging
-        //printf("Value after division = %d!\n", thisMean); // Debugging
     }
 }
 
@@ -61,7 +58,7 @@ void print_results()
 {
     int i;
 
-    for(i = 0; i < FILE_SIZE; i++) // we only need to report the first hundred lines
+    for(i = 0; i < lines_to_read; i++) // we only need to report the first hundred lines
     {
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
@@ -73,9 +70,13 @@ void print_results()
 
 main(int argc, char *argv[])
 {
-    if(argc = 2) // If we pass in more than just the name of the program, we must be changing the number of cores used
+    if(argc >= 2) // If we pass in more than just the name of the program, we must be changing the number of cores used
     {
-        number_of_cores = atoi(argv[1]); // change the number of cores to the number of cores allocated
+        number_of_cores = atoi(argv[1]); // I don't think MPI implementation makes this work like the others
+        if(argc >= 3 && atoi(argv[2]) < FILE_SIZE)
+        {
+            lines_to_read = atoi(argv[2]);
+        }
     }
 
     int i, rc, iterations = 0;
@@ -86,6 +87,7 @@ main(int argc, char *argv[])
     ssize_t pass_line_size;
     time_t start; // time before parallel
     time_t end; // time after parallel
+    time(&start);
 
     FILE *fp = fopen(FILE_NAME, "r");
     if(!fp)
@@ -103,14 +105,13 @@ main(int argc, char *argv[])
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-    number_of_cores = numtasks; // Remove me later
+    number_of_cores = numtasks; // Numtasks is defined in a different setup call
 
     if(rank == 0)
     {
         init_arrays();
         pass_line_buffer = NULL;
         pass_line_size = 0;
-        time(&start);
     }
 
     for(i = 0; i < FILE_SIZE; i++)
@@ -126,7 +127,7 @@ main(int argc, char *argv[])
         for(i = 0; i < rank; i++)
         {
             local_line_size = getline(&local_line_buffer, &local_line_buf_size, fp); // Skip ahead lines in the file
-            if(local_line_size < 0)
+            if(local_line_size < 0 || (i + iterations * number_of_cores) >= lines_to_read)
             {
                 end_of_file = 0;
                 continue;
@@ -139,25 +140,24 @@ main(int argc, char *argv[])
         }
 
         mean_lines(rank, iterations); // Do our work with the line
-        iterations++;
 
         for(i = 0; i < number_of_cores - rank - 1; i++)
         {
             local_line_size = getline(&local_line_buffer, &local_line_buf_size, fp); // Skip ahead lines in the file
-            if(local_line_size < 0)
+            if(local_line_size < 0 || (i + rank + iterations * number_of_cores) > lines_to_read)
             {
                 end_of_file = 0;
                 continue;
             }
         }
+
+        iterations++;
     }
 
-    //printf("I broke out of the while! (Rank %d)\n", rank); // Debugging
     MPI_Reduce(local_mean_values, mean_values, FILE_SIZE, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD); // Combine all of the calculated values into the single array
 
     if(rank == 0)
     {
-        //printf("We should get here at the end. Is this the case?\n"); // Debugging
         /* Close the file when we are done */
         fclose(fp);
         time(&end);
