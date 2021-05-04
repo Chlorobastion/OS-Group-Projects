@@ -3,13 +3,13 @@
 #include <stdlib.h>
 #include <time.h>
 
-//#define FILE_NAME "Test.txt"
 #define FILE_NAME "/homes/dan/625/wiki_dump.txt"
 #define FILE_SIZE 1000000
 
 double mean_values[FILE_SIZE]; // the size of this array should be the total lines in the file
 int line_num = 0; // global variable to keep track of the current line being dealt with
 int number_of_cores = 1; // number of cores being used in our multiprocessing
+int lines_to_read = FILE_SIZE;
 int lines_per_thread = 25;
 
 void init_arrays()
@@ -32,23 +32,11 @@ void read_file()
     }
 
     int end_of_file = 1; // This will act similar to a boolean
-    int nthreads, tid;
     while(end_of_file > 0)
     {
         // Split up the threads to go in parallel here
-        #pragma omp parallel num_threads(number_of_cores) private(tid)
+        #pragma omp parallel num_threads(number_of_cores)
         {
-            tid = omp_get_thread_num();
-
-            /* Only master thread will do this (Debugging) */
-            /*
-            if(tid == 0)
-            {
-                nthreads = omp_get_num_threads();
-                printf("Number of threads = %d\n", nthreads);
-            }
-            */
-
             int myFirstLine, i;
             char *line_buffer[lines_per_thread];
             size_t line_buf_size = 0;
@@ -66,7 +54,7 @@ void read_file()
                 for(i = 0; i < lines_per_thread; i++) // going to grab a bunch of lines at once
                 {
                     line_size[i] = getline(&line_buffer[i], &line_buf_size, fp); // Grab a line in the file
-                    if(line_size[i] < 0)
+                    if(line_size[i] < 0 || line_num + i > lines_to_read)
                     {
                         continue;
                     }
@@ -77,7 +65,7 @@ void read_file()
 
             for(i = 0; i < lines_per_thread; i++)
             {
-                if(line_size[i] >= 0) // We are not at end of the file
+                if(line_size[i] >= 0 && myFirstLine + i < lines_to_read) // We are not at end of the file
                 {
                     int j = 0;
                     char thisChar;
@@ -117,21 +105,24 @@ void print_results()
 {
     int i;
 
-    for(i = 0; i < FILE_SIZE; i++) // should be the number of lines in the file
+    for(i = 0; i < lines_to_read; i++) // should be the number of lines in the file
     {
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
             printf("%d: %.1f\n", i, mean_values[i]); // print the information to the console
-            
         }
     }
 }
 
 main(int argc, char *argv[])
 {
-    if(argc = 2) // If we pass in more than just the name of the program, we must be changing the number of cores used
+    if(argc >= 2) // If we pass in more than just the name of the program, we must be changing the number of cores used
     {
         number_of_cores = atoi(argv[1]); // change the number of cores to the number of cores allocated
+        if(argc >= 3 && atoi(argv[2]) < FILE_SIZE)
+        {
+            lines_to_read = atoi(argv[2]);
+        }
     }
     init_arrays();
     time_t start; // time before parallel

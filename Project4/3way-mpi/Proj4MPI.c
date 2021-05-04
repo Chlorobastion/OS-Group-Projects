@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-//#define FILE_NAME "Test.txt"
 #define FILE_NAME "/homes/dan/625/wiki_dump.txt"
 #define FILE_SIZE 1000000
 
@@ -63,7 +62,6 @@ void print_results()
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
             printf("%d: %.1f\n", i, mean_values[i]); // print the information to the console
-            
         }
     }
 }
