@@ -7,14 +7,13 @@
 #define FILE_NAME "/homes/dan/625/wiki_dump.txt"
 #define FILE_SIZE 1000000
 
-double mean_values[FILE_SIZE]; // the size of this array should be the total lines in the file
-double local_mean_values[FILE_SIZE];
+float mean_values[FILE_SIZE]; // the size of this array should be the total lines in the file
+float local_mean_values[FILE_SIZE];
 int number_of_cores = 1; // number of cores being used in our multiprocessing
 int end_of_file = 1; // This will act similar to a boolean
 char *local_line_buffer;
 size_t local_line_buf_size = 0;
 ssize_t local_line_size;
-int iterations = 0;
 
 void init_arrays()
 {
@@ -26,7 +25,7 @@ void init_arrays()
     }
 }
 
-void *mean_lines(void *rank)
+void *mean_lines(int rank, int iterations)
 {
     int myLine = rank + iterations * number_of_cores; // Need to keep track of the line numbr this thread is dealing with
 
@@ -34,22 +33,27 @@ void *mean_lines(void *rank)
     {
         int j = 0;
         char thisChar;
-        double thisMean = 0;
-        thisChar = local_line_buffer[j];
+        float thisMean = 0;
+        char *thisLine = local_line_buffer;
+        thisChar = thisLine[j];
         // Iterate over the entire line, ending at the null terminal or a new line character
         while(thisChar != '\0' && thisChar != '\n')
         {
             thisMean += (int) thisChar;
             j++; // Move to the next character in the line
-            thisChar = local_line_buffer[j]; // get the character at this i and j (line and symbol)
+            thisChar = thisLine[j]; // get the character at this i and j (line and symbol)
         }
         // Check if the line had content to calculate
+        //printf("Value before division = %d!\n", thisMean); // Debugging
+        //printf("Line %i has length %d\n", myLine, j); // Debugging
         if(j > 0)
         {
             thisMean = thisMean / j;
         }
 
         local_mean_values[myLine] = thisMean;
+        //printf("I calculated line %d!\n", myLine); // Debugging
+        //printf("Value after division = %d!\n", thisMean); // Debugging
     }
 }
 
@@ -57,7 +61,7 @@ void print_results()
 {
     int i;
 
-    for(i = 0; i < 100; i++) // we only need to report the first hundred lines
+    for(i = 0; i < FILE_SIZE; i++) // we only need to report the first hundred lines
     {
         if(mean_values[i] != 0) // We won't care about lines that don't have content (make out files smaller)
         {
@@ -74,7 +78,7 @@ main(int argc, char *argv[])
         number_of_cores = atoi(argv[1]); // change the number of cores to the number of cores allocated
     }
 
-    int i, rc;
+    int i, rc, iterations = 0;
     int numtasks, rank;
     MPI_Status Status;
     char *pass_line_buffer;
@@ -98,6 +102,8 @@ main(int argc, char *argv[])
     }
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+    number_of_cores = numtasks; // Remove me later
 
     if(rank == 0)
     {
@@ -117,41 +123,41 @@ main(int argc, char *argv[])
 
     while(end_of_file > 0)
     {
-        if(rank == 0)
+        for(i = 0; i < rank; i++)
         {
-            local_line_size = getline(&local_line_buffer, &local_line_buf_size, fp); // Grab a line in the file for rank 0
+            local_line_size = getline(&local_line_buffer, &local_line_buf_size, fp); // Skip ahead lines in the file
             if(local_line_size < 0)
             {
                 end_of_file = 0;
                 continue;
             }
-            if(number_of_cores > 1)
+        }
+        local_line_size = getline(&local_line_buffer, &local_line_buf_size, fp); // Grab the line in the file for this rank
+        if(local_line_size < 0)
+        {
+            end_of_file = 0;
+        }
+
+        mean_lines(rank, iterations); // Do our work with the line
+        iterations++;
+
+        for(i = 0; i < number_of_cores - rank - 1; i++)
+        {
+            local_line_size = getline(&local_line_buffer, &local_line_buf_size, fp); // Skip ahead lines in the file
+            if(local_line_size < 0)
             {
-                for(i = 1; i < number_of_cores; i++)
-                {
-                    pass_line_size = getline(&pass_line_buffer, &pass_line_buf_size, fp); // Grab a line in the file for the other ranks
-                    if(pass_line_size < 0)
-                    {
-                        end_of_file = 0;
-                        continue;
-                    }
-                    MPI_Send(&pass_line_buffer, pass_line_size, MPI_CHAR, i, i, MPI_COMM_WORLD); // Pass the file line to the thread to handle
-                }
+                end_of_file = 0;
+                continue;
             }
         }
-
-        if(rank != 0)
-        {
-            MPI_Recv(&local_line_buffer, local_line_size, MPI_CHAR, 0, rank, MPI_COMM_WORLD, MPI_STATUS_IGNORE); // Wait until we receive our message with the line
-        }
-
-        mean_lines(&rank); // Do our work with the line
-        iterations++;
     }
+
+    //printf("I broke out of the while! (Rank %d)\n", rank); // Debugging
+    MPI_Reduce(local_mean_values, mean_values, FILE_SIZE, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD); // Combine all of the calculated values into the single array
 
     if(rank == 0)
     {
-        MPI_Reduce(local_mean_values, mean_values, FILE_SIZE, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); // Combine all of the calculated values into the single array
+        //printf("We should get here at the end. Is this the case?\n"); // Debugging
         /* Close the file when we are done */
         fclose(fp);
         time(&end);
