@@ -28,6 +28,9 @@ clean:
 load:
 	./load.sh
 
+grade:
+	sbatch --time=1 --mem-per-cpu=2G --cpus-per-task=4 --ntasks=1 --nodes=1 --constraint=elves ./grade.sh
+
 slurm:
 	sbatch --time=5 --mem-per-cpu=2G --cpus-per-task=1 --ntasks=1 --nodes=1 --constraint=elves ./run.sh 1
 	sbatch --time=5 --mem-per-cpu=2G --cpus-per-task=2 --ntasks=1 --nodes=1 --constraint=elves ./run.sh 2
