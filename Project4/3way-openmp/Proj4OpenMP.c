@@ -130,7 +130,7 @@ main(int argc, char *argv[])
     time(&start);
     read_file();
     time(&end);
-    print_results();
+    //print_results();
     double elapsed = difftime(end, start); // time taken to calculate mean
     printf("Cores used: %d\n", number_of_cores); // debugging info.
     printf("File Size (#of lines being read): %d\n", lines_to_read); // debugging info.
